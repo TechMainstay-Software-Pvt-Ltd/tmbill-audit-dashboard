@@ -157,8 +157,8 @@ const sourceAudits=[
 function Badge({tone="neutral",children}:{tone?:string;children:React.ReactNode}) {
   return <span className={`badge ${tone}`}>{children}</span>
 }
-function Kpi({label,value,sub,tone="good"}:{label:string;value:string;sub:string;tone?:string}) {
-  return <article className={`kpi ${tone}`}><div className="kpiLabel">{label}</div><div className="kpiValue">{value}</div><div className="kpiSub">{sub}</div></article>
+function Kpi({label,value,sub,tone="good",onClick}:{label:string;value:string;sub:string;tone?:string;onClick?:()=>void}) {
+  return <article className={`kpi ${tone} ${onClick?"clickableKpi":""}`} onClick={onClick} onKeyDown={e=>{if(onClick&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onClick()}}} role={onClick?"button":undefined} tabIndex={onClick?0:undefined}><div className="kpiLabel">{label}</div><div className="kpiValue">{value}</div><div className="kpiSub">{sub}</div>{onClick&&<span className="kpiAction">View detail →</span>}</article>
 }
 function SalesReconciliation({grossItems,totalReductions,complimentary,vat,charges,actualSales}:{grossItems:number;totalReductions:number;complimentary:number;vat:number;charges:number;actualSales:number}) {
   const discounts=+(totalReductions-complimentary).toFixed(2);
@@ -203,10 +203,11 @@ function TenderValue({row,tender}:{row:any;tender:"card"|"cash"|"talabat"|"deliv
   return <span className={invalid?"invalidTender":""}>{money(value)}{invalid&&<small>Unexpected channel</small>}</span>
 }
 type GridCol={key:string;label:string;numeric?:boolean;defaultVisible?:boolean;value?:(r:any)=>string|number;render?:(r:any)=>React.ReactNode};
-function DataGrid({id,rows,columns,totals,onRowClick,selectedKey}:{id:string;rows:any[];columns:GridCol[];totals?:Record<string,React.ReactNode>;onRowClick?:(r:any)=>void;selectedKey?:string}) {
+function DataGrid({id,rows,columns,totals,onRowClick,selectedKey,renderExpanded}:{id:string;rows:any[];columns:GridCol[];totals?:Record<string,React.ReactNode>;onRowClick?:(r:any)=>void;selectedKey?:string;renderExpanded?:(r:any)=>React.ReactNode}) {
   const [order,setOrder]=useState(columns.map(c=>c.key));
   const [visible,setVisible]=useState<Record<string,boolean>>(()=>Object.fromEntries(columns.map(c=>[c.key,c.defaultVisible!==false])));
   const [sort,setSort]=useState<{key:string;dir:1|-1}|null>(null);
+  const [expanded,setExpanded]=useState<string|null>(null);
   const [chooser,setChooser]=useState(false);
   const colMap=useMemo(()=>new Map(columns.map(c=>[c.key,c])),[columns]);
   const active=order.filter(k=>visible[k]).map(k=>colMap.get(k)!).filter(Boolean);
@@ -215,8 +216,16 @@ function DataGrid({id,rows,columns,totals,onRowClick,selectedKey}:{id:string;row
   const exportExcel=()=>{const header=active.map(c=>c.label);const body=sorted.map(r=>active.map(c=>{const v=c.value?c.value(r):r[c.key];return typeof v==="number"||typeof v==="string"?v:String(v??"")}));if(totals)body.push(active.map(c=>{const v=totals[c.key];return typeof v==="number"||typeof v==="string"?v:""}));const ws=XLSX.utils.aoa_to_sheet([header,...body]);ws["!cols"]=header.map((h,i)=>({wch:Math.min(40,Math.max(h.length+2,...body.slice(0,200).map(r=>String(r[i]??"").length+2)))}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Report");XLSX.writeFile(wb,`${id.replace(/[^a-z0-9]+/gi,"-")}.xlsx`)};
   return <div className={`gridShell dataGrid-${id}`}><div className="gridTools"><span>{num(rows.length)} rows</span><button type="button" onClick={exportExcel}>Export Excel ↓</button><button type="button" onClick={e=>{e.stopPropagation();setChooser(v=>!v)}}>Columns ▾</button>{chooser&&<div className="columnChooser" role="group" aria-label="Visible table columns" onClick={e=>e.stopPropagation()}><strong>Show or hide columns</strong>{columns.map(c=><label key={c.key} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={visible[c.key]!==false} onClick={e=>e.stopPropagation()} onChange={e=>setVisible(v=>({...v,[c.key]:e.target.checked}))}/><span>{c.label}</span></label>)}</div>}</div>
     <div className="tablePanel smartGrid"><table><thead><tr>{active.map(c=><th key={c.key} draggable onDragStart={e=>e.dataTransfer.setData("text/plain",c.key)} onDragOver={e=>e.preventDefault()} onDrop={e=>move(e.dataTransfer.getData("text/plain"),c.key)} onClick={()=>setSort(s=>s?.key===c.key?{key:c.key,dir:s.dir===1?-1:1}:{key:c.key,dir:1})} className={c.numeric?"numeric":""}>{c.label}<i>{sort?.key===c.key?(sort.dir===1?" ↑":" ↓"):" ↔"}</i></th>)}</tr></thead>
-      <tbody>{sorted.map((r,i)=><tr key={r.id||r.rowId||r.name||i} onClick={()=>onRowClick?.(r)} className={(selectedKey&&(r.billNo===selectedKey||r.id===selectedKey))?"selected":""}>{active.map(c=><td key={c.key} className={c.numeric?"numeric":""}>{c.render?c.render(r):String(c.value?c.value(r):r[c.key]??"—")}</td>)}</tr>)}</tbody>
+      <tbody>{sorted.map((r,i)=>{const rowKey=String(r.id||r.rowId||r.name||r.date||r.week||i);const isExpanded=expanded===rowKey;return [
+        <tr key={rowKey} onClick={()=>{if(renderExpanded)setExpanded(isExpanded?null:rowKey);onRowClick?.(r)}} className={`${(selectedKey&&(r.billNo===selectedKey||r.id===selectedKey))?"selected":""} ${renderExpanded?"expandableRow":""}`}>{active.map((c,j)=><td key={c.key} className={c.numeric?"numeric":""}>{j===0&&renderExpanded&&<span className="expandGlyph">{isExpanded?"−":"+"}</span>}{c.render?c.render(r):String(c.value?c.value(r):r[c.key]??"—")}</td>)}</tr>,
+        isExpanded&&renderExpanded?<tr key={`${rowKey}-detail`} className="expandedDetailRow"><td colSpan={active.length}>{renderExpanded(r)}</td></tr>:null
+      ]})}</tbody>
       {totals&&<tfoot><tr>{active.map(c=><td key={c.key} className={c.numeric?"numeric":""}>{totals[c.key]??""}</td>)}</tr></tfoot>}</table></div></div>
+}
+
+function MixDrill({invoices}:{invoices:Invoice[]}) {
+  const summarize=(key:"orderType"|"paymentMode")=>Object.values(invoices.reduce((a:any,x)=>{const k=x[key]||"Unclassified";a[k]??={name:k,orders:0,sales:0,vat:0};a[k].orders++;a[k].sales+=x.total;a[k].vat+=x.vat;return a},{})).sort((a:any,b:any)=>b.sales-a.sales) as any[];
+  return <div className="rowDrill"><div><h4>Order types · high to low</h4>{summarize("orderType").map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.orders)} orders</span><strong>{money(x.sales)}</strong><small>VAT {money(x.vat)}</small></p>)}</div><div><h4>Payment modes · high to low</h4>{summarize("paymentMode").map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.orders)} invoices</span><strong>{money(x.sales)}</strong><small>Collection label</small></p>)}</div></div>
 }
 
 export default function Home() {
@@ -343,6 +352,19 @@ export default function Home() {
   const paymentTotals=[
     ["Card",53321.15,936],["Cash",10729.9,301],["TALABAT",42601.1,578],["Keeta",1520.6,16]
   ] as const;
+  const orderTypeNames=["Dine In","Pickup","Delivery","Talabat","Keeta"];
+  const weekdayNames=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const invoiceDay=(x:Invoice)=>{const [d,m,y]=x.date.split("-").map(Number);return new Date(y,m-1,d)};
+  const weekdayOrderMix=weekdayNames.map(day=>{
+    const invoices=data.invoices.filter(x=>x.status==="Fulfilled"&&weekdayNames[invoiceDay(x).getDay()]===day);
+    const row:any={day,orders:invoices.length,total:invoices.reduce((a,x)=>a+x.total,0)};
+    orderTypeNames.forEach(type=>row[type]=invoices.filter(x=>x.orderType===type).reduce((a,x)=>a+x.total,0));
+    const ranked=orderTypeNames.map(type=>({type,value:row[type]})).sort((a,b)=>b.value-a.value);
+    row.dominant=ranked[0]?.type||"—";row.weakest=[...ranked].reverse().find(x=>x.value>0)?.type||"—";
+    return row;
+  });
+  const invoicesForDay=(date:string)=>data.invoices.filter(x=>x.status==="Fulfilled"&&`${String(invoiceDay(x).getFullYear())}-${String(invoiceDay(x).getMonth()+1).padStart(2,"0")}-${String(invoiceDay(x).getDate()).padStart(2,"0")}`===date);
+  const invoicesForWeek=(week:string)=>{const index=businessInsights?.weekly.findIndex(x=>x.week===week)??-1;return index<0?[]:data.invoices.filter(x=>{const d=invoiceDay(x).getDate();return x.status==="Fulfilled"&&d>=index*7+1&&d<=Math.min(30,index*7+7)})};
   return <div className="app">
     <aside className="sidebar">
       <div className="brand"><div className="logo">TM</div><div><b>TMBill Audit</b><small>Revenue intelligence</small></div></div>
@@ -362,23 +384,23 @@ export default function Home() {
           <div className="heroScore"><b>97%</b><span>financial control confidence</span><small>3 exceptions require correction</small></div>
         </section>
         <section className="kpiGrid">
-          <Kpi label="Gross Item Sales" value={money(+s.correctedGrossBeforeDiscount)} sub={`${num(+s.totalItemQuantity)} items before any reductions`}/>
-          <Kpi label="Discounts" value={money(+s.canonicalOrderDiscount)} sub="Order and promotional reductions"/>
-          <Kpi label="Complimentary" value={money(+s.canonicalItemDiscount)} sub="Fattoush #2990 · reason, actor and time retained"/>
-          <Kpi label="Total Reductions" value={money(+s.canonicalTotalDiscount)} sub="Discounts + Complimentary"/>
-          <Kpi label="Net Item Sales incl. VAT" value={money(+s.taxableGrossInclVat)} sub="Gross Item Sales − Total Reductions"/>
-          <Kpi label="VAT" value={money(+s.vat)} sub="Included tax disclosure · control AED 5,124.93"/>
-          <Kpi label="Net Item Sales excl. VAT" value={money(+s.taxableGrossInclVat-+s.vat)} sub="Net Item Sales incl. VAT − VAT"/>
-          <Kpi label="Charges incl. VAT" value={money(+s.charges)} sub="Must be classified by charge type and tax treatment"/>
-          <Kpi label="Actual Sales incl. VAT" value={money(+s.grossSales)} sub="Net Item Sales incl. VAT + Charges incl. VAT"/>
-          <Kpi label="Bill series" value={`#${s.billFrom}–#${s.billTo}`} sub={`${num(+s.fulfilledInvoices)} fulfilled bills generated`}/>
-          <Kpi label="Average cheque" value={money(+s.averageCheck)} sub="Revenue per fulfilled bill"/>
-          <Kpi label="Average per person" value={money(+s.averagePerPerson)} sub={`${num(+s.totalGuests)} recorded guests`}/>
-          {businessInsights&&<Kpi label="Average turnaround" value={minutesLabel(businessInsights.summary.overallAverageMinutes)} sub={`Median ${minutesLabel(businessInsights.summary.overallMedianMinutes)} · placed to settlement`}/>}
-          {businessInsights&&<Kpi tone="warn" label="Turnaround coverage" value={`${num(businessInsights.summary.ordersWithTurnaround)} / ${num(+s.fulfilledInvoices)}`} sub={`${num(businessInsights.summary.ordersMissingTurnaround)} missing · mainly aggregator orders`}/>}
-          <Kpi tone="bad" label="Payment allocation gap" value={money(+s.paymentComponentGap)} sub="Missing secondary split-tender allocations"/>
-          <Kpi tone="warn" label="Charge classification gap" value={money(61)} sub="All charges 581 vs DSR delivery charges 520"/>
-          <Kpi tone="bad" label="Category overstatement" value={money(+s.categoryOverstatement)} sub="Item export net exceeds invoice total"/>
+          <Kpi onClick={()=>setTab("items")} label="Gross Item Sales" value={money(+s.correctedGrossBeforeDiscount)} sub={`${num(+s.totalItemQuantity)} items before any reductions`}/>
+          <Kpi onClick={()=>setTab("discounts")} label="Discounts" value={money(+s.canonicalOrderDiscount)} sub="Order and promotional reductions"/>
+          <Kpi onClick={()=>{setSelectedBill("2990");setTab("bills")}} label="Complimentary" value={money(+s.canonicalItemDiscount)} sub="Fattoush #2990 · reason, actor and time retained"/>
+          <Kpi onClick={()=>setTab("discounts")} label="Total Reductions" value={money(+s.canonicalTotalDiscount)} sub="Discounts + Complimentary"/>
+          <Kpi onClick={()=>setTab("crosscheck")} label="Net Item Sales incl. VAT" value={money(+s.taxableGrossInclVat)} sub="Gross Item Sales − Total Reductions"/>
+          <Kpi onClick={()=>setTab("vat")} label="VAT" value={money(+s.vat)} sub="Included tax disclosure · control AED 5,124.93"/>
+          <Kpi onClick={()=>setTab("vat")} label="Net Item Sales excl. VAT" value={money(+s.taxableGrossInclVat-+s.vat)} sub="Net Item Sales incl. VAT − VAT"/>
+          <Kpi onClick={()=>setTab("crosscheck")} label="Charges incl. VAT" value={money(+s.charges)} sub="Must be classified by charge type and tax treatment"/>
+          <Kpi onClick={()=>setTab("zreport")} label="Actual Sales incl. VAT" value={money(+s.grossSales)} sub="Net Item Sales incl. VAT + Charges incl. VAT"/>
+          <Kpi onClick={()=>setTab("bills")} label="Bill series" value={`#${s.billFrom}–#${s.billTo}`} sub={`${num(+s.fulfilledInvoices)} fulfilled bills generated`}/>
+          <Kpi onClick={()=>setTab("bills")} label="Average cheque" value={money(+s.averageCheck)} sub="Revenue per fulfilled bill"/>
+          <Kpi onClick={()=>setTab("bills")} label="Average per person" value={money(+s.averagePerPerson)} sub={`${num(+s.totalGuests)} recorded guests`}/>
+          {businessInsights&&<Kpi onClick={()=>document.getElementById("turnaround-insights")?.scrollIntoView({behavior:"smooth"})} label="Average turnaround" value={minutesLabel(businessInsights.summary.overallAverageMinutes)} sub={`Median ${minutesLabel(businessInsights.summary.overallMedianMinutes)} · placed to settlement`}/>}
+          {businessInsights&&<Kpi onClick={()=>document.getElementById("turnaround-insights")?.scrollIntoView({behavior:"smooth"})} tone="warn" label="Turnaround coverage" value={`${num(businessInsights.summary.ordersWithTurnaround)} / ${num(+s.fulfilledInvoices)}`} sub={`${num(businessInsights.summary.ordersMissingTurnaround)} missing · mainly aggregator orders`}/>}
+          <Kpi onClick={()=>setTab("payments")} tone="bad" label="Payment allocation gap" value={money(+s.paymentComponentGap)} sub="Missing secondary split-tender allocations"/>
+          <Kpi onClick={()=>setTab("crosscheck")} tone="warn" label="Charge classification gap" value={money(61)} sub="All charges 581 vs DSR delivery charges 520"/>
+          <Kpi onClick={()=>setTab("categories")} tone="bad" label="Category overstatement" value={money(+s.categoryOverstatement)} sub="Item export net exceeds invoice total"/>
         </section>
         <section className="developerControlPanel">
           <div className="salesBridgeVisual"><div className="panelHead"><div><h3>June sales bridge · one calculation for every report</h3><p>Follow the arrows from transaction-time item value to the invoice/customer total.</p></div><Badge tone="good">RECONCILES</Badge></div>
@@ -393,12 +415,12 @@ export default function Home() {
             <button onClick={()=>setTab("crosscheck")}><em>CHARGES</em><b>AED 61.00 disappears from DSR</b><span>Invoice charges AED 581 versus delivery-only AED 520.</span><strong>Normalize charge type + charge VAT →</strong></button>
           </div>
         </section>
-        <section className="insightShortcuts"><div><span>JUMP TO INSIGHT</span>{[["Executive","executive-highlights"],["Turnaround","turnaround-insights"],["Supply × payment","supply-collection-insights"],["Hourly","hourly-insights"],["Weekday","weekday-insights"],["Daily","daily-insights"],["Weekly","weekly-insights"],["Leakage & items","protection-insights"],["Recommendations","controller-recommendations"]].map(([label,id])=><button key={id} onClick={()=>document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"})}>{label}</button>)}</div><a href="/downloads/June_Business_Insights.pdf" download>Download business insights PDF ↓</a></section>
+        <section className="insightShortcuts"><div><span>JUMP TO INSIGHT</span>{[["Executive","executive-highlights"],["Turnaround","turnaround-insights"],["Supply × payment","supply-collection-insights"],["Hourly","hourly-insights"],["Weekday + order type","weekday-insights"],["Daily","daily-insights"],["Weekly","weekly-insights"],["Leakage & items","protection-insights"],["Recommendations","controller-recommendations"]].map(([label,id])=><button key={id} onClick={()=>document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"})}>{label}</button>)}</div><a href="/downloads/June_Business_Insights.pdf" download>Download business insights PDF ↓</a></section>
         <section className="twoCol" id="executive-highlights">
           <div className="panel"><div className="panelHead"><div><h3>June executive highlights</h3><p>The strongest operating signals from the reconciled invoice ledger.</p></div><Badge tone="good">CONTROLLED</Badge></div>
             {businessInsights&&<div className="highlightList">
-              <div><span>Best revenue date</span><b>{businessInsights.operatingHighlights.bestRevenueDay.date}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div>
-              <div><span>Highest order volume</span><b>{businessInsights.operatingHighlights.bestOrderDay.date}</b><strong>{num(businessInsights.operatingHighlights.bestOrderDay.orders)} orders</strong></div>
+              <div><span>Best revenue date</span><b>{new Date(`${businessInsights.operatingHighlights.bestRevenueDay.date}T12:00:00`).toLocaleDateString("en-AE",{weekday:"long",day:"2-digit",month:"short"})}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div>
+              <div><span>Highest order volume</span><b>{new Date(`${businessInsights.operatingHighlights.bestOrderDay.date}T12:00:00`).toLocaleDateString("en-AE",{weekday:"long",day:"2-digit",month:"short"})}</b><strong>{num(businessInsights.operatingHighlights.bestOrderDay.orders)} orders</strong></div>
               <div><span>Peak revenue hour</span><b>{businessInsights.operatingHighlights.peakHour.label}</b><strong>{money(businessInsights.operatingHighlights.peakHour.revenue)}</strong></div>
               <div><span>Strongest full week</span><b>{[...businessInsights.weekly].sort((a,b)=>b.revenue-a.revenue)[0]?.week}</b><strong>{money([...businessInsights.weekly].sort((a,b)=>b.revenue-a.revenue)[0]?.revenue||0)}</strong></div>
             </div>}
@@ -432,17 +454,23 @@ export default function Home() {
             <div className="panel wide weekdayPanel" id="weekday-insights"><div className="panelHead"><div><h3>Weekday revenue performance</h3><p>Graph on the left, sortable control table on the right.</p></div></div>
               <div className="weekdaySplit"><div><MetricLine rows={businessInsights.weekday} valueKey="averageDailyRevenue" labelKey="day" color="#d08b22"/></div><DataGrid id="weekday-performance" rows={businessInsights.weekday} columns={[{key:"day",label:"Day"},{key:"days",label:"Days",numeric:true,defaultVisible:false},{key:"orders",label:"Orders",numeric:true},{key:"averageDailyRevenue",label:"Avg daily revenue",numeric:true,render:x=>money(x.averageDailyRevenue)},{key:"averageCheck",label:"Avg check",numeric:true,defaultVisible:false,render:x=>money(x.averageCheck)}]} totals={{day:"TOTAL / AVG",days:"30",orders:num(+s.fulfilledInvoices),averageDailyRevenue:money(+s.grossSales/30),averageCheck:money(+s.averageCheck)}}/></div>
             </div>
+            <div className="panel wide weekdayOrderPanel"><div className="panelHead"><div><h3>Order type × weekday sales mix</h3><p>Compare each supply channel by weekday. Dominant and lowest active order types are identified for faster scheduling and channel planning.</p></div><Badge tone="good">AED 108,172.75</Badge></div>
+              <DataGrid id="weekday-order-mix" rows={weekdayOrderMix} renderExpanded={x=><MixDrill invoices={data.invoices.filter(i=>i.status==="Fulfilled"&&weekdayNames[invoiceDay(i).getDay()]===x.day)}/>} columns={[
+                {key:"day",label:"Weekday"},{key:"orders",label:"Orders",numeric:true},{key:"Dine In",label:"Dine In",numeric:true,render:x=>money(x["Dine In"])},{key:"Pickup",label:"Pickup",numeric:true,render:x=>money(x.Pickup)},{key:"Delivery",label:"Delivery",numeric:true,render:x=>money(x.Delivery)},{key:"Talabat",label:"Talabat",numeric:true,render:x=>money(x.Talabat)},{key:"Keeta",label:"Keeta",numeric:true,render:x=>money(x.Keeta)},{key:"total",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.total)},{key:"dominant",label:"Dominant order type",render:x=><Badge tone="good">{x.dominant}</Badge>},{key:"weakest",label:"Lowest active",render:x=><span className="weakMix">{x.weakest}</span>}
+              ]} totals={{day:"TOTAL",orders:num(+s.fulfilledInvoices),"Dine In":money(35247.7),Pickup:money(20262.85),Delivery:money(8657.5),Talabat:money(42549.7),Keeta:money(1455),total:money(+s.grossSales),dominant:"Talabat",weakest:"Keeta"}}/>
+              <Info title="Decision use" tone="blue">Click a weekday row to expand its order-type and payment mix from highest to lowest. Use this matrix to plan channel availability, kitchen capacity and promotions; it measures sales contribution, not profitability.</Info>
+            </div>
           </section>
           <section className="analyticsGrid">
             <div className="panel wide" id="daily-insights"><div className="panelHead"><div><h3>Daily revenue trend · June 2026</h3><p>Day numbers run from 1 to 30; hover a point for the exact revenue.</p></div><Badge tone="good">30 DAYS</Badge></div>
               <MetricLine rows={businessInsights.daily.map(x=>({...x,dayLabel:String(Number(x.date.slice(-2)))}))} valueKey="revenue" labelKey="dayLabel"/>
-              <DataGrid id="daily-performance" rows={businessInsights.daily} columns={[
+              <DataGrid id="daily-performance" rows={businessInsights.daily} renderExpanded={x=><MixDrill invoices={invoicesForDay(x.date)}/>} columns={[
                 {key:"date",label:"June day",numeric:true,value:x=>Number(x.date.slice(-2)),render:x=>String(Number(x.date.slice(-2)))},{key:"day",label:"Day"},{key:"orders",label:"Orders",numeric:true},{key:"guests",label:"Guests",numeric:true,defaultVisible:false},{key:"revenue",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"vat",label:"VAT",numeric:true,defaultVisible:false,render:x=>money(x.vat)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)},{key:"firstActivity",label:"First bill",defaultVisible:false},{key:"lastActivity",label:"Last bill",defaultVisible:false},{key:"observedWindowMinutes",label:"Observed window",numeric:true,defaultVisible:false,render:x=>minutesLabel(x.observedWindowMinutes)}
               ]} totals={{date:"TOTAL",orders:num(+s.fulfilledInvoices),guests:num(+s.totalGuests),revenue:money(+s.grossSales),discount:money(10461.25),vat:money(+s.vat),averageCheck:money(+s.averageCheck)}}/>
             </div>
             <div className="panel wide compactWeekly" id="weekly-insights"><div className="panelHead"><div><h3>Week-by-week control</h3><p>Revenue, orders and discount pressure across the month · hover each point for detail.</p></div></div>
               <MetricLine rows={businessInsights.weekly} valueKey="revenue" labelKey="week" color="#6d55a3"/>
-              <DataGrid id="weekly-performance" rows={businessInsights.weekly} columns={[{key:"week",label:"Week"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"revenue",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{week:"TOTAL",days:"30",orders:num(+s.fulfilledInvoices),revenue:money(+s.grossSales),discount:money(10461.25),averageCheck:money(+s.averageCheck)}}/>
+              <DataGrid id="weekly-performance" rows={businessInsights.weekly.map((x,i)=>({...x,weekNumber:`Week ${i+1}`}))} renderExpanded={x=><MixDrill invoices={invoicesForWeek(x.week)}/>} columns={[{key:"weekNumber",label:"Week no."},{key:"week",label:"Date range"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"revenue",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{weekNumber:"TOTAL",week:"June",days:"30",orders:num(+s.fulfilledInvoices),revenue:money(+s.grossSales),discount:money(10461.25),averageCheck:money(+s.averageCheck)}}/>
               <div className="operatingCards"><div><span>Longest observed billing window</span><b>{businessInsights.operatingHighlights.longestDay.date}</b><strong>{businessInsights.operatingHighlights.longestDay.firstActivity}–{businessInsights.operatingHighlights.longestDay.lastActivity}</strong></div><div><span>Shortest observed billing window</span><b>{businessInsights.operatingHighlights.shortestDay.date}</b><strong>{businessInsights.operatingHighlights.shortestDay.firstActivity}–{businessInsights.operatingHighlights.shortestDay.lastActivity}</strong></div><div><span>Highest revenue date</span><b>{businessInsights.operatingHighlights.bestRevenueDay.date}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div><div><span>Most orders / recorded guests</span><b>{businessInsights.operatingHighlights.bestOrderDay.date}</b><strong>{businessInsights.operatingHighlights.bestOrderDay.orders} / {businessInsights.operatingHighlights.bestGuestDay.guests}</strong></div></div>
               <Info title="Operating-hours limitation" tone="amber">First and last bill times show the observed transaction window, not staff attendance or official opening hours. Near-24-hour windows should trigger a business-date-cutoff review before labor decisions are made.</Info>
             </div>
