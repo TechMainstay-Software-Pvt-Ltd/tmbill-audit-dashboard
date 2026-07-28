@@ -30,6 +30,10 @@ type KotAudit={
   summary:Record<string,any>;bills:any[];events:any[];cancellations:any[];edited:any[];
   complimentary:any[];topCancelledItems:any[];reportAudit:any[];
 };
+type BusinessInsights={
+  summary:Record<string,number>;turnaroundByType:any[];invoiceTurnaround:Record<string,any>;
+  turnaroundRows:any[];discountSummary:any[];discountDetails:any[];
+};
 
 function auditUploadedSalesRows(rows:any[][],fileName:string):SeparateAudit {
   const headers=(rows[0]||[]).map(x=>String(x??"").trim());
@@ -171,6 +175,11 @@ function Info({title,children,tone="blue"}:{title:string;children:React.ReactNod
 function Bar({value,max,color="#17a673"}:{value:number;max:number;color?:string}) {
   return <div className="bar"><i style={{width:`${Math.max(1,value/max*100)}%`,background:color}} /></div>
 }
+function minutesLabel(value:number|null|undefined) {
+  if(value===null||value===undefined)return "Not captured";
+  const hours=Math.floor(value/60),minutes=Math.round(value%60);
+  return hours?`${hours}h ${minutes}m`:`${minutes} min`;
+}
 function TenderValue({row,tender}:{row:any;tender:"card"|"cash"|"talabat"|"deliveroo"|"keeta"}) {
   const value=Number(row[tender]||0);
   if(!value)return <span className="zeroDash">—</span>;
@@ -199,6 +208,7 @@ export default function Home() {
   const [paymentRecon,setPaymentRecon]=useState<PaymentReconciliation|null>(null);
   const [separateAudit,setSeparateAudit]=useState<SeparateAudit|null>(null);
   const [kotAudit,setKotAudit]=useState<KotAudit|null>(null);
+  const [businessInsights,setBusinessInsights]=useState<BusinessInsights|null>(null);
   const [tab,setTab]=useState("overview");
   const [query,setQuery]=useState("");
   const [orderType,setOrderType]=useState("All");
@@ -224,10 +234,14 @@ export default function Home() {
   const [kotDate,setKotDate]=useState("All");
   const [kotPage,setKotPage]=useState(1);
   const [selectedKotBill,setSelectedKotBill]=useState("2990");
+  const [discountQuery,setDiscountQuery]=useState("");
+  const [discountLevel,setDiscountLevel]=useState("All");
+  const [discountPage,setDiscountPage]=useState(1);
   useEffect(()=>{fetch("/data/audit-data.json").then(r=>r.json()).then(setData)},[]);
   useEffect(()=>{fetch("/data/payment-reconciliation.json").then(r=>r.json()).then(setPaymentRecon)},[]);
   useEffect(()=>{fetch("/data/separate-sales-audit.json").then(r=>r.json()).then(setSeparateAudit)},[]);
   useEffect(()=>{fetch("/data/item-kot-audit.json").then(r=>r.json()).then(setKotAudit)},[]);
+  useEffect(()=>{fetch("/data/business-insights.json").then(r=>r.json()).then(setBusinessInsights)},[]);
   const handleSalesUpload=async(file?:File)=>{
     if(!file)return;setUploadError("");
     try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:"array",cellDates:false});const rows=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null});const audited=auditUploadedSalesRows(rows,file.name);setSeparateAudit(audited);setSelectedSeparateBill("");setSeparateStatus("All");setSeparateIssue("All");setQuery("");}
@@ -257,6 +271,7 @@ export default function Home() {
   },[data,query,orderType,priceStatus]);
   const selected=useMemo(()=>data?.invoices.find(x=>x.billNo===selectedBill)||null,[data,selectedBill]);
   const selectedLines=useMemo(()=>selected?data?.items.filter(x=>x.invoiceId===selected.id)||[]:[],[data,selected]);
+  const selectedTurnaround=selected?businessInsights?.invoiceTurnaround[selected.id]||null:null;
   const separateRows=useMemo(()=>separateAudit?.invoices.filter(x=>(separateStatus==="All"||x.assessment===separateStatus)&&(separateIssue==="All"||x.issues.includes(separateIssue))&&(!query||x.billNo.includes(query)||x.id.toLowerCase().includes(query.toLowerCase())||x.orderType.toLowerCase().includes(query.toLowerCase())))||[],[separateAudit,separateStatus,separateIssue,query]);
   const separateSelected=useMemo(()=>separateAudit?.invoices.find(x=>x.billNo===selectedSeparateBill)||null,[separateAudit,selectedSeparateBill]);
   const separateMatrix=useMemo(()=>{
@@ -288,6 +303,15 @@ export default function Home() {
   const selectedKotSummary=useMemo(()=>kotAudit?.bills.find(x=>x.billNo===selectedKotBill)||null,[kotAudit,selectedKotBill]);
   useEffect(()=>setKotPage(1),[deferredKotQuery,kotStatus,kotUser,kotDate]);
   useEffect(()=>{if(kotPage>kotPageCount)setKotPage(kotPageCount)},[kotPage,kotPageCount]);
+  const filteredDiscountDetails=useMemo(()=>{
+    if(!businessInsights)return[];
+    const q=discountQuery.trim().toLowerCase();
+    return businessInsights.discountDetails.filter(x=>(discountLevel==="All"||x.level===discountLevel)&&(!q||[x.billNo,x.orderId,x.title,x.reason,x.user,x.orderType].some(v=>String(v||"").toLowerCase().includes(q))));
+  },[businessInsights,discountQuery,discountLevel]);
+  const discountPageSize=100;
+  const discountPageCount=Math.max(1,Math.ceil(filteredDiscountDetails.length/discountPageSize));
+  const pagedDiscountDetails=useMemo(()=>filteredDiscountDetails.slice((discountPage-1)*discountPageSize,discountPage*discountPageSize),[filteredDiscountDetails,discountPage]);
+  useEffect(()=>setDiscountPage(1),[discountQuery,discountLevel]);
   const menuRows=useMemo(()=>{
     if(!data)return[];
     const avgQty=data.topItems.reduce((a,x)=>a+x.qty,0)/Math.max(1,data.topItems.length);
@@ -332,6 +356,8 @@ export default function Home() {
           <Kpi label="Bill series" value={`#${s.billFrom}–#${s.billTo}`} sub={`${num(+s.fulfilledInvoices)} fulfilled bills generated`}/>
           <Kpi label="Average cheque" value={money(+s.averageCheck)} sub="Revenue per fulfilled bill"/>
           <Kpi label="Average per person" value={money(+s.averagePerPerson)} sub={`${num(+s.totalGuests)} recorded guests`}/>
+          {businessInsights&&<Kpi label="Average turnaround" value={minutesLabel(businessInsights.summary.overallAverageMinutes)} sub={`Median ${minutesLabel(businessInsights.summary.overallMedianMinutes)} · placed to settlement`}/>}
+          {businessInsights&&<Kpi tone="warn" label="Turnaround coverage" value={`${num(businessInsights.summary.ordersWithTurnaround)} / ${num(+s.fulfilledInvoices)}`} sub={`${num(businessInsights.summary.ordersMissingTurnaround)} missing · mainly aggregator orders`}/>}
           <Kpi tone="bad" label="Payment allocation gap" value={money(+s.paymentComponentGap)} sub="Missing secondary split-tender allocations"/>
           <Kpi tone="warn" label="Charge classification gap" value={money(61)} sub="All charges 581 vs DSR delivery charges 520"/>
           <Kpi tone="bad" label="Category overstatement" value={money(+s.categoryOverstatement)} sub="Item export net exceeds invoice total"/>
@@ -346,6 +372,17 @@ export default function Home() {
             <button className="issueRow medium" onClick={()=>setTab("categories")}><span>03</span><div><b>Category denominator mismatch</b><small>Percentages add to 106.29%, not 100%</small></div><strong>Trace →</strong></button>
           </div>
         </section>
+        {businessInsights&&<section className="twoCol insightCharts">
+          <div className="panel"><div className="panelHead"><div><h3>Order turnaround by order type</h3><p>Placed Time → Settlement Time · fulfilled invoices with both timestamps.</p></div><Badge tone="warn">P90 {minutesLabel(businessInsights.summary.overallP90Minutes)}</Badge></div>
+            <div className="turnaroundChart">{businessInsights.turnaroundByType.map(x=><button key={x.orderType} onClick={()=>{setOrderType(x.orderType);setTab("bills")}}><div><b>{x.orderType}</b><span>{num(x.orders)} timed orders · median {minutesLabel(x.medianMinutes)}</span></div><div className="timeTrack"><i style={{width:`${Math.min(100,x.averageMinutes/100*100)}%`}}/><em style={{left:`${Math.min(98,x.p90Minutes/180*100)}%`}} title={`P90 ${minutesLabel(x.p90Minutes)}`}/></div><strong>{minutesLabel(x.averageMinutes)}</strong></button>)}</div>
+            <div className="chartLegend"><span><i className="avg"/>Average turnaround</span><span><i className="p90"/>P90 marker</span><span>{num(businessInsights.summary.over60)} orders exceeded 60 minutes</span></div>
+          </div>
+          <div className="panel"><div className="panelHead"><div><h3>Supply mix × collection mix</h3><p>Two views of the same AED 108,172.75 control total—not a one-to-one tender mapping.</p></div><Badge tone="good">RECONCILED</Badge></div>
+            <div className="mixCompare"><h4>Sales by order type</h4>{orderTotals.map(([name,value,count],i)=><button key={name} onClick={()=>{setOrderType(name);setTab("bills")}}><span>{name}<small>{count} orders</small></span><div><i className={`mix${i}`} style={{width:`${value/+s.grossSales*100}%`}}/></div><b>{(value/+s.grossSales*100).toFixed(1)}%</b><strong>{money(value)}</strong></button>)}
+              <h4>Collections by payment mode</h4>{paymentTotals.map(([name,value,count],i)=><button key={name} onClick={()=>setTab("payments")}><span>{name}<small>{count} allocations</small></span><div><i className={`pay${i}`} style={{width:`${value/+s.grossSales*100}%`}}/></div><b>{(value/+s.grossSales*100).toFixed(1)}%</b><strong>{money(value)}</strong></button>)}</div>
+            <Info title="How to read this" tone="blue">Order type explains where the sale occurred; payment mode explains how it was collected. Talabat and Keeta should usually align, while Dine In, Pickup and Delivery normally split across Card and Cash. Split tenders require multiple allocation rows.</Info>
+          </div>
+        </section>}
         <Info title="What this means" tone="blue">The dashboard headline, order-type, tax, discount and staff totals are reliable. Category mix, item revenue, split-payment exports and inventory profit metrics need redesign before they should guide decisions.</Info>
       </>}
 
@@ -372,6 +409,7 @@ export default function Home() {
             {key:"controlStatus",label:"Control",render:x=><Badge tone={x.controlStatus==="pass"?"good":x.controlStatus==="corrected"?"warn":"bad"}>{x.controlStatus}</Badge>}
           ]} totals={{billNo:"TOTAL",guests:num(filteredInvoices.reduce((a,x)=>a+x.guests,0)),canonicalGrossBeforeDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalGrossBeforeDiscount,0)),canonicalItemDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalItemDiscount,0)),canonicalOrderDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalOrderDiscount,0)),canonicalTotalDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalTotalDiscount,0)),canonicalTaxableInclVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalTaxableInclVat,0)),canonicalNetExVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalNetExVat,0)),canonicalVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalVat,0)),charges:money(filteredInvoices.reduce((a,x)=>a+x.charges,0)),total:money(filteredInvoices.reduce((a,x)=>a+x.total,0))}}/>
           <div className="drawer">{selected&&<><div className="drawerHead"><div><span>INVOICE TRACE</span><h3>Bill #{selected.billNo}</h3><p>{selected.date} · {selected.time} · {selected.orderType}</p></div>{selected.hasAnomaly?<Badge tone="bad">FAIL</Badge>:<Badge tone="good">PASS</Badge>}</div>
+            <div className="invoiceTime"><div><span>ORDER PLACED</span><b>{selectedTurnaround?.placedAt||"Not captured"}</b></div><i>→</i><div><span>SETTLED</span><b>{selectedTurnaround?.settledAt||"Not captured"}</b></div><strong><span>CUSTOMER / ORDER TURNAROUND</span>{minutesLabel(selectedTurnaround?.turnaroundMinutes)}</strong></div>
             <div className="bridge"><div><span>Subtotal</span><b>{money(selected.subtotal)}</b></div><i>−</i><div><span>Invoice discount</span><b>{money(selected.discount)}</b></div><i>+</i><div><span>Charges</span><b>{money(selected.charges)}</b></div><i>=</i><div className="total"><span>Gross total</span><b>{money(selected.total)}</b></div></div>
             <div className="controlBox bad"><span>ITEM ↔ INVOICE DISCOUNT CONTROL</span><div><b>Item lines</b><strong>{money(selected.itemLineDiscount)}</strong></div><div><b>Invoice header</b><strong>{money(selected.discount)}</strong></div><div><b>Variance</b><strong>{money(selected.discountVariance)}</strong></div></div>
             <div className="controlBox"><span>CORRECTED DISCOUNT & VAT BRIDGE</span><div><b>Original item gross</b><strong>{money(selected.canonicalGrossBeforeDiscount)}</strong></div><div><b>Item-level discount</b><strong>− {money(selected.canonicalItemDiscount)}</strong></div><div><b>Eligible order discount</b><strong>− {money(selected.canonicalOrderDiscount)}</strong></div><div><b>Taxable incl VAT</b><strong>{money(selected.canonicalTaxableInclVat)}</strong></div><div><b>VAT (5/105)</b><strong>{money(selected.canonicalVat)}</strong></div><div><b>Net ex VAT</b><strong>{money(selected.canonicalNetExVat)}</strong></div></div>
@@ -412,7 +450,18 @@ export default function Home() {
       </section>}
 
       {tab==="discounts"&&<>
-        <section className="kpiGrid compact"><Kpi label="Invoice discounts" value={money(10461.25)} sub="Canonical header total"/><Kpi label="Item-export discounts" value={money(10474.25)} sub="Includes malformed bill 2990 line" tone="bad"/><Kpi label="Variance" value={money(13)} sub="Confirmed defect" tone="bad"/><Kpi label="Discounted invoices" value="587" sub="250 offline · 337 online"/></section>
+        {businessInsights&&<><section className="kpiGrid compact"><Kpi label="Order / invoice discounts" value={money(businessInsights.summary.invoiceDiscount)} sub="587 fulfilled invoices · Sales Report components"/><Kpi label="Confirmed complimentary" value={money(businessInsights.summary.itemComplimentary)} sub="Fattoush on #2990 · item-level authorization" tone="warn"/><Kpi label="Unified discounts" value={money(businessInsights.summary.unifiedDiscount)} sub="Order/invoice + item complimentary"/><Kpi label="Discount evidence rows" value={num(businessInsights.discountDetails.length)} sub="Title, reason, user, bill and source linked"/></section>
+        <Info title="Corrected interpretation of the AED 13" tone="blue">The AED 13 is not an unresolved variance. It is a confirmed complimentary Fattoush on bill #2990. The Sales Report stores the bill subtotal after that item was reduced to zero and separately records the 10% “Al Zaeem” order discount of AED 8.10. The Complimentary Items and KOT Item-wise reports provide the item title, user, timestamp and reason. The unified discount control is therefore AED 10,461.25 invoice/order discounts + AED 13.00 complimentary = AED 10,474.25.</Info>
+        <section className="panel"><div className="panelHead"><div><h3>Discount title × reason summary</h3><p>Linked from Sales Report discount components and the confirmed complimentary event.</p></div><Badge tone="good">LINKED</Badge></div>
+          <DataGrid id="discount-summary-linked" rows={businessInsights.discountSummary} columns={[
+            {key:"title",label:"Discount title"},{key:"reason",label:"Recorded reason"},{key:"level",label:"Level"},{key:"bills",label:"Bills",numeric:true},{key:"amount",label:"Discount amount",numeric:true,render:x=>money(x.amount)},{key:"users",label:"Users"},{key:"sources",label:"Evidence source"}
+          ]} totals={{title:"UNIFIED TOTAL",bills:num(new Set(businessInsights.discountDetails.map(x=>x.billNo)).size),amount:money(businessInsights.summary.unifiedDiscount)}}/>
+        </section>
+        <div className="filters discountFilters"><label className="search"><span>⌕</span><input value={discountQuery} onChange={e=>setDiscountQuery(e.target.value)} placeholder="Search bill, order ID, title, reason, user or order type…"/></label><select value={discountLevel} onChange={e=>setDiscountLevel(e.target.value)}><option>All</option><option>Order / invoice</option><option>Item</option></select><span className="resultCount">{num(filteredDiscountDetails.length)} evidence rows</span></div>
+        <DataGrid id="discount-evidence" rows={pagedDiscountDetails} onRowClick={x=>{setSelectedBill(x.billNo);setTab("bills")}} columns={[
+          {key:"billNo",label:"Bill",render:x=><><b>#{x.billNo}</b><small>{x.orderId}</small></>},{key:"date",label:"Date"},{key:"settledAt",label:"Settled time"},{key:"orderType",label:"Order type"},{key:"title",label:"Discount title"},{key:"reason",label:"Reason"},{key:"level",label:"Level"},{key:"amount",label:"Amount",numeric:true,render:x=>money(x.amount)},{key:"user",label:"User"},{key:"source",label:"Linked source"},{key:"control",label:"Control",render:x=><Badge tone={x.control==="review"?"bad":x.control==="confirmed"?"warn":"good"}>{x.control}</Badge>}
+        ]} totals={{billNo:`PAGE ${discountPage}/${discountPageCount}`,title:`${num(pagedDiscountDetails.length)} displayed`,amount:money(pagedDiscountDetails.reduce((a,x)=>a+x.amount,0))}}/>
+        <div className="pager"><button disabled={discountPage===1} onClick={()=>setDiscountPage(p=>p-1)}>← Previous</button><span>Rows {(discountPage-1)*discountPageSize+1}–{Math.min(discountPage*discountPageSize,filteredDiscountDetails.length)} of {num(filteredDiscountDetails.length)}</span><button disabled={discountPage===discountPageCount} onClick={()=>setDiscountPage(p=>p+1)}>Next →</button></div></>}
         <section className="panel"><div className="panelHead"><div><h3>Required discount allocation waterfall</h3><p>The exact calculation every category and item report should use.</p></div></div>
           <div className="steps">{[
             ["1","Line gross","Quantity × transaction unit price"],
@@ -605,7 +654,7 @@ export default function Home() {
             {key:"period",label:"Period"},{key:"bills",label:"Bills",numeric:true},{key:"gross",label:"Original gross",numeric:true,render:x=>money(x.gross)},{key:"itemDiscount",label:"Item discount",numeric:true,render:x=>money(x.itemDiscount)},{key:"orderDiscount",label:"Order discount",numeric:true,render:x=>money(x.orderDiscount)},{key:"charges",label:"Charges",numeric:true,render:x=>money(x.charges)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Net ex VAT",numeric:true,render:x=>money(x.netExVat)},{key:"total",label:"Total revenue",numeric:true,render:x=>money(x.total)}
           ]}/>
           :selectedReport==="Payment Type Summary"?<DataGrid id="report-payments" rows={paymentTotals.map(([name,total,allocations])=>({name,total,allocations,mix:total/+s.grossSales*100}))} columns={[{key:"name",label:"Tender"},{key:"allocations",label:"Allocations",numeric:true},{key:"total",label:"Collected",numeric:true,render:x=>money(x.total)},{key:"mix",label:"Mix %",numeric:true,render:x=>`${x.mix.toFixed(2)}%`}]} totals={{name:"TOTAL",allocations:"1,831",total:money(+s.grossSales),mix:"100.00%"}}/>
-          :selectedReport==="Discount Summary"?<><DataGrid id="report-discounts" rows={[{level:"Confirmed item adjustment",bills:1,discount:+s.canonicalItemDiscount,status:"Minimum confirmed"},{level:"Invoice/order discounts",bills:587,discount:+s.canonicalOrderDiscount,status:"Reconciled"}]} columns={[{key:"level",label:"Discount level"},{key:"bills",label:"Bills",numeric:true},{key:"discount",label:"Discount",numeric:true,render:x=>money(x.discount)},{key:"status",label:"Control"}]} totals={{level:"CONFIRMED MINIMUM",discount:money(+s.canonicalTotalDiscount)}}/><Info title="Completeness limitation" tone="red">The June item exports confirm one normally chargeable line sold at zero: Fattoush on bill #2990. They do not retain original transaction-time menu price or a separate item-discount field, so partial item-level discounts cannot be certified. Current-menu comparisons produce hundreds of price variances that may reflect menu-version changes rather than discounts.</Info></>
+          :selectedReport==="Discount Summary"&&businessInsights?<><DataGrid id="report-discounts" rows={businessInsights.discountSummary} columns={[{key:"title",label:"Discount title"},{key:"reason",label:"Recorded reason"},{key:"level",label:"Level"},{key:"bills",label:"Bills",numeric:true},{key:"amount",label:"Discount",numeric:true,render:x=>money(x.amount)},{key:"users",label:"Users"},{key:"sources",label:"Linked source"}]} totals={{title:"UNIFIED TOTAL",amount:money(businessInsights.summary.unifiedDiscount)}}/><Info title="Linked discount rule" tone="blue">The complimentary AED 13 is confirmed and classified, not left as an unexplained variance. Production should preserve this item-level event separately from the AED 8.10 Al Zaeem order discount on #2990 and exclude the complimentary line from the order-discount base.</Info></>
           :selectedReport==="Bill Summary"?<DataGrid id="report-bills" rows={data.invoices} columns={[
             {key:"billNo",label:"Bill"},{key:"id",label:"Order ID"},{key:"date",label:"Supply date"},{key:"orderType",label:"Order type"},
             {key:"canonicalGrossBeforeDiscount",label:"Gross",numeric:true,render:x=>money(x.canonicalGrossBeforeDiscount)},
