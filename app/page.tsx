@@ -203,6 +203,11 @@ function TenderValue({row,tender}:{row:any;tender:"card"|"cash"|"talabat"|"deliv
   return <span className={invalid?"invalidTender":""}>{money(value)}{invalid&&<small>Unexpected channel</small>}</span>
 }
 type GridCol={key:string;label:string;numeric?:boolean;defaultVisible?:boolean;value?:(r:any)=>string|number;render?:(r:any)=>React.ReactNode};
+type MixMetric="orders"|"inclVat"|"exVat"|"vat";
+function MetricSelector({value,onChange}:{value:MixMetric;onChange:(v:MixMetric)=>void}) {
+  const choices:Array<[MixMetric,string]>=[["inclVat","Revenue incl. VAT"],["exVat","Revenue excl. VAT"],["vat","VAT"],["orders","Orders"]];
+  return <div className="metricSelector" aria-label="Table measure">{choices.map(([id,label])=><button type="button" key={id} className={value===id?"active":""} onClick={()=>onChange(id)}>{label}</button>)}</div>
+}
 function DataGrid({id,rows,columns,totals,onRowClick,selectedKey,renderExpanded}:{id:string;rows:any[];columns:GridCol[];totals?:Record<string,React.ReactNode>;onRowClick?:(r:any)=>void;selectedKey?:string;renderExpanded?:(r:any)=>React.ReactNode}) {
   const [order,setOrder]=useState(columns.map(c=>c.key));
   const [visible,setVisible]=useState<Record<string,boolean>>(()=>Object.fromEntries(columns.map(c=>[c.key,c.defaultVisible!==false])));
@@ -223,9 +228,19 @@ function DataGrid({id,rows,columns,totals,onRowClick,selectedKey,renderExpanded}
       {totals&&<tfoot><tr>{active.map(c=><td key={c.key} className={c.numeric?"numeric":""}>{totals[c.key]??""}</td>)}</tr></tfoot>}</table></div></div>
 }
 
-function MixDrill({invoices}:{invoices:Invoice[]}) {
+function MixDrill({invoices,paymentExceptions=[],metric="inclVat"}:{invoices:Invoice[];paymentExceptions?:any[];metric?:MixMetric}) {
   const summarize=(key:"orderType"|"paymentMode")=>Object.values(invoices.reduce((a:any,x)=>{const k=x[key]||"Unclassified";a[k]??={name:k,orders:0,sales:0,vat:0};a[k].orders++;a[k].sales+=x.total;a[k].vat+=x.vat;return a},{})).sort((a:any,b:any)=>b.sales-a.sales) as any[];
-  return <div className="rowDrill"><div><h4>Order types · high to low</h4>{summarize("orderType").map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.orders)} orders</span><strong>{money(x.sales)}</strong><small>VAT {money(x.vat)}</small></p>)}</div><div><h4>Payment modes · high to low</h4>{summarize("paymentMode").map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.orders)} invoices</span><strong>{money(x.sales)}</strong><small>Collection label</small></p>)}</div></div>
+  const exceptionMap=new Map(paymentExceptions.map(x=>[x.billNo,x]));
+  const payments=Object.values(invoices.reduce((a:any,x)=>{
+    const split=exceptionMap.get(x.billNo);
+    const allocations=split?["card","cash","talabat","deliveroo","keeta"].map(k=>({name:k[0].toUpperCase()+k.slice(1),value:Number(split[k]||0)})).filter(y=>y.value>0):[{name:x.paymentMode||"Unclassified",value:x.total}];
+    allocations.forEach(y=>{const share=x.total?y.value/x.total:0;a[y.name]??={name:y.name,allocations:0,sales:0,vat:0};a[y.name].allocations++;a[y.name].sales+=y.value;a[y.name].vat+=x.vat*share});
+    return a;
+  },{})).sort((a:any,b:any)=>b.sales-a.sales) as any[];
+  const value=(x:any,countKey:string)=>metric==="orders"?Number(x[countKey]||0):metric==="vat"?Number(x.vat||0):metric==="exVat"?Number(x.sales||0)-Number(x.vat||0):Number(x.sales||0);
+  const format=(v:number)=>metric==="orders"?num(v):money(v);
+  const orderRows=summarize("orderType").sort((a,b)=>value(b,"orders")-value(a,"orders")),paymentRows=[...payments].sort((a,b)=>value(b,"allocations")-value(a,"allocations"));
+  return <div className="rowDrill"><div><h4>Order types · high to low</h4>{orderRows.map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.orders)} orders</span><strong>{format(value(x,"orders"))}</strong><small>VAT {money(x.vat)}</small></p>)}</div><div><h4>Payment modes · high to low</h4>{paymentRows.map(x=><p key={x.name}><b>{x.name}</b><span>{num(x.allocations)} allocations</span><strong>{format(value(x,"allocations"))}</strong><small>{x.name==="Card"||x.name==="Cash"?"Split components included":"Collection channel"}</small></p>)}</div></div>
 }
 
 export default function Home() {
@@ -262,6 +277,7 @@ export default function Home() {
   const [discountQuery,setDiscountQuery]=useState("");
   const [discountLevel,setDiscountLevel]=useState("All");
   const [discountPage,setDiscountPage]=useState(1);
+  const [mixMetric,setMixMetric]=useState<MixMetric>("inclVat");
   useEffect(()=>{fetch("/data/audit-data.json").then(r=>r.json()).then(setData)},[]);
   useEffect(()=>{fetch("/data/payment-reconciliation.json").then(r=>r.json()).then(setPaymentRecon)},[]);
   useEffect(()=>{fetch("/data/separate-sales-audit.json").then(r=>r.json()).then(setSeparateAudit)},[]);
@@ -357,12 +373,28 @@ export default function Home() {
   const invoiceDay=(x:Invoice)=>{const [d,m,y]=x.date.split("-").map(Number);return new Date(y,m-1,d)};
   const weekdayOrderMix=weekdayNames.map(day=>{
     const invoices=data.invoices.filter(x=>x.status==="Fulfilled"&&weekdayNames[invoiceDay(x).getDay()]===day);
-    const row:any={day,orders:invoices.length,total:invoices.reduce((a,x)=>a+x.total,0)};
-    orderTypeNames.forEach(type=>row[type]=invoices.filter(x=>x.orderType===type).reduce((a,x)=>a+x.total,0));
-    const ranked=orderTypeNames.map(type=>({type,value:row[type]})).sort((a,b)=>b.value-a.value);
+    const row:any={day,orders:invoices.length,totalInclVat:invoices.reduce((a,x)=>a+x.total,0),totalVat:invoices.reduce((a,x)=>a+x.vat,0)};
+    orderTypeNames.forEach(type=>{const lines=invoices.filter(x=>x.orderType===type);row[`${type}InclVat`]=lines.reduce((a,x)=>a+x.total,0);row[`${type}Vat`]=lines.reduce((a,x)=>a+x.vat,0);row[`${type}Orders`]=lines.length});
+    const metric=(type:string)=>mixMetric==="orders"?row[`${type}Orders`]:mixMetric==="vat"?row[`${type}Vat`]:mixMetric==="exVat"?row[`${type}InclVat`]-row[`${type}Vat`]:row[`${type}InclVat`];
+    orderTypeNames.forEach(type=>row[type]=metric(type));
+    row.total=mixMetric==="orders"?row.orders:mixMetric==="vat"?row.totalVat:mixMetric==="exVat"?row.totalInclVat-row.totalVat:row.totalInclVat;
+    const ranked=orderTypeNames.map(type=>({type,value:metric(type)})).sort((a,b)=>b.value-a.value);
     row.dominant=ranked[0]?.type||"—";row.weakest=[...ranked].reverse().find(x=>x.value>0)?.type||"—";
     return row;
   });
+  const mixValue=(value:number)=>mixMetric==="orders"?num(value):money(value);
+  const mixLabel=mixMetric==="orders"?"Order count":mixMetric==="vat"?"VAT":mixMetric==="exVat"?"Revenue excl. VAT":"Revenue incl. VAT";
+  const biMetric=(x:any,average=false)=>{const divisor=average?Math.max(1,Number(x.days||1)):1;return (mixMetric==="orders"?Number(x.orders||0):mixMetric==="vat"?Number(x.vat||0):mixMetric==="exVat"?Number(x.revenue||0)-Number(x.vat||0):Number(x.revenue||0))/divisor};
+  const metricFrom=(orders:number,inclVat:number,vat:number)=>mixMetric==="orders"?orders:mixMetric==="vat"?vat:mixMetric==="exVat"?inclVat-vat:inclVat;
+  const orderMixRows=orderTypeNames.map(name=>{const lines=data.invoices.filter(x=>x.status==="Fulfilled"&&x.orderType===name);const inclVat=lines.reduce((a,x)=>a+x.total,0),vat=lines.reduce((a,x)=>a+x.vat,0);return {name,orders:lines.length,inclVat,vat,value:metricFrom(lines.length,inclVat,vat)}}).filter(x=>x.orders);
+  const paymentExceptionMap=new Map((paymentRecon?.exceptions||[]).map((x:any)=>[x.billNo,x]));
+  const paymentMixRows=Object.values(data.invoices.filter(x=>x.status==="Fulfilled").reduce((a:any,x)=>{
+    const split:any=paymentExceptionMap.get(x.billNo);
+    const allocations=split?["card","cash","talabat","deliveroo","keeta"].map(k=>({name:k[0].toUpperCase()+k.slice(1),value:Number(split[k]||0)})).filter(y=>y.value>0):[{name:x.paymentMode||"Unclassified",value:x.total}];
+    allocations.forEach(y=>{const share=x.total?y.value/x.total:0;a[y.name]??={name:y.name,orders:0,inclVat:0,vat:0};a[y.name].orders++;a[y.name].inclVat+=y.value;a[y.name].vat+=x.vat*share});
+    return a;
+  },{})).map((x:any)=>({...x,value:metricFrom(x.orders,x.inclVat,x.vat)})).sort((a:any,b:any)=>b.value-a.value) as any[];
+  const orderMetricTotal=orderMixRows.reduce((a,x)=>a+x.value,0),paymentMetricTotal=paymentMixRows.reduce((a,x)=>a+x.value,0);
   const invoicesForDay=(date:string)=>data.invoices.filter(x=>x.status==="Fulfilled"&&`${String(invoiceDay(x).getFullYear())}-${String(invoiceDay(x).getMonth()+1).padStart(2,"0")}-${String(invoiceDay(x).getDate()).padStart(2,"0")}`===date);
   const invoicesForWeek=(week:string)=>{const index=businessInsights?.weekly.findIndex(x=>x.week===week)??-1;return index<0?[]:data.invoices.filter(x=>{const d=invoiceDay(x).getDate();return x.status==="Fulfilled"&&d>=index*7+1&&d<=Math.min(30,index*7+7)})};
   return <div className="app">
@@ -437,12 +469,13 @@ export default function Home() {
             <div className="chartLegend"><span><i className="avg"/>Average turnaround</span><span><i className="p90"/>P90 marker</span><span>{num(businessInsights.summary.over60)} orders exceeded 60 minutes</span></div>
           </div>
           <div className="panel" id="supply-collection-insights"><div className="panelHead"><div><h3>Supply mix × collection mix</h3><p>Sortable controls with fixed totals for two dimensions of AED 108,172.75.</p></div><Badge tone="good">RECONCILED</Badge></div>
-            <div className="mixTablesRow"><div><h4 className="mixTableTitle">Sales by order type</h4><DataGrid id="overview-order-mix" rows={orderTotals.map(([name,value,count])=>({name,value,count,mix:value/+s.grossSales*100}))} onRowClick={x=>{setOrderType(x.name);setTab("bills")}} columns={[
-              {key:"name",label:"Order type"},{key:"count",label:"Orders",numeric:true},{key:"value",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
-            ]} totals={{name:"TOTAL",count:num(+s.fulfilledInvoices),value:money(+s.grossSales),mix:"100.0%"}}/></div>
-            <div><h4 className="mixTableTitle">Collections by payment mode</h4><DataGrid id="overview-payment-mix" rows={paymentTotals.map(([name,value,count])=>({name,value,count,mix:value/+s.grossSales*100}))} onRowClick={()=>setTab("payments")} columns={[
-              {key:"name",label:"Payment mode"},{key:"count",label:"Allocations",numeric:true},{key:"value",label:"Collected",numeric:true,render:x=>money(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix payment"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
-            ]} totals={{name:"TOTAL",count:"1,831",value:money(+s.grossSales),mix:"100.0%"}}/></div></div>
+            <MetricSelector value={mixMetric} onChange={setMixMetric}/>
+            <div className="mixTablesRow"><div><h4 className="mixTableTitle">Sales by order type</h4><DataGrid id="overview-order-mix" rows={orderMixRows.map(x=>({...x,mix:x.value/Math.max(1,orderMetricTotal)*100}))} onRowClick={x=>{setOrderType(x.name);setTab("bills")}} columns={[
+              {key:"name",label:"Order type"},{key:"orders",label:"Orders",numeric:true},{key:"value",label:mixLabel,numeric:true,render:x=>mixValue(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
+            ]} totals={{name:"TOTAL",orders:num(+s.fulfilledInvoices),value:mixValue(orderMetricTotal),mix:"100.0%"}}/></div>
+            <div><h4 className="mixTableTitle">Collections by payment mode</h4><DataGrid id="overview-payment-mix" rows={paymentMixRows.map(x=>({...x,mix:x.value/Math.max(1,paymentMetricTotal)*100}))} onRowClick={()=>setTab("payments")} columns={[
+              {key:"name",label:"Payment mode"},{key:"orders",label:"Allocations",numeric:true},{key:"value",label:mixLabel,numeric:true,render:x=>mixValue(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix payment"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
+            ]} totals={{name:"TOTAL",orders:num(paymentMixRows.reduce((a,x)=>a+x.orders,0)),value:mixValue(paymentMetricTotal),mix:"100.0%"}}/></div></div>
             <Info title="How to read this" tone="blue">Order type explains where the sale occurred; payment mode explains how it was collected. Talabat and Keeta should usually align, while Dine In, Pickup and Delivery normally split across Card and Cash. Split tenders require multiple allocation rows.</Info>
           </div>
         </section>}
@@ -452,25 +485,29 @@ export default function Home() {
               <div className="hourBars">{businessInsights.hourly.map(x=><div key={x.hour} title={`${x.label}: ${money(x.revenue)} · ${x.orders} orders`}><span><i style={{height:`${x.revenue/Math.max(...businessInsights.hourly.map(h=>h.revenue))*100}%`}}/></span><small>{x.hour%3===0?x.label.replace(" ",""):""}</small></div>)}</div>
             </div>
             <div className="panel wide weekdayPanel" id="weekday-insights"><div className="panelHead"><div><h3>Weekday revenue performance</h3><p>Graph on the left, sortable control table on the right.</p></div></div>
-              <div className="weekdaySplit"><div><MetricLine rows={businessInsights.weekday} valueKey="averageDailyRevenue" labelKey="day" color="#d08b22"/></div><DataGrid id="weekday-performance" rows={businessInsights.weekday} columns={[{key:"day",label:"Day"},{key:"days",label:"Days",numeric:true,defaultVisible:false},{key:"orders",label:"Orders",numeric:true},{key:"averageDailyRevenue",label:"Avg daily revenue",numeric:true,render:x=>money(x.averageDailyRevenue)},{key:"averageCheck",label:"Avg check",numeric:true,defaultVisible:false,render:x=>money(x.averageCheck)}]} totals={{day:"TOTAL / AVG",days:"30",orders:num(+s.fulfilledInvoices),averageDailyRevenue:money(+s.grossSales/30),averageCheck:money(+s.averageCheck)}}/></div>
+              <MetricSelector value={mixMetric} onChange={setMixMetric}/>
+              <div className="weekdaySplit"><div><MetricLine rows={businessInsights.weekday.map(x=>({...x,displayValue:biMetric(x,true)}))} valueKey="displayValue" labelKey="day" color="#d08b22"/></div><DataGrid id="weekday-performance" rows={businessInsights.weekday.map(x=>({...x,displayValue:biMetric(x,true)}))} columns={[{key:"day",label:"Day"},{key:"days",label:"Days",numeric:true,defaultVisible:false},{key:"orders",label:"Total orders",numeric:true},{key:"displayValue",label:`Average daily ${mixLabel.toLowerCase()}`,numeric:true,render:x=>mixValue(x.displayValue)},{key:"averageCheck",label:"Avg check",numeric:true,defaultVisible:false,render:x=>money(x.averageCheck)}]} totals={{day:"TOTAL / AVG",days:"30",orders:num(+s.fulfilledInvoices),displayValue:mixValue(biMetric({orders:+s.fulfilledInvoices,revenue:+s.grossSales,vat:+s.vat,days:30},true)),averageCheck:money(+s.averageCheck)}}/></div>
             </div>
             <div className="panel wide weekdayOrderPanel"><div className="panelHead"><div><h3>Order type × weekday sales mix</h3><p>Compare each supply channel by weekday. Dominant and lowest active order types are identified for faster scheduling and channel planning.</p></div><Badge tone="good">AED 108,172.75</Badge></div>
-              <DataGrid id="weekday-order-mix" rows={weekdayOrderMix} renderExpanded={x=><MixDrill invoices={data.invoices.filter(i=>i.status==="Fulfilled"&&weekdayNames[invoiceDay(i).getDay()]===x.day)}/>} columns={[
-                {key:"day",label:"Weekday"},{key:"orders",label:"Orders",numeric:true},{key:"Dine In",label:"Dine In",numeric:true,render:x=>money(x["Dine In"])},{key:"Pickup",label:"Pickup",numeric:true,render:x=>money(x.Pickup)},{key:"Delivery",label:"Delivery",numeric:true,render:x=>money(x.Delivery)},{key:"Talabat",label:"Talabat",numeric:true,render:x=>money(x.Talabat)},{key:"Keeta",label:"Keeta",numeric:true,render:x=>money(x.Keeta)},{key:"total",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.total)},{key:"dominant",label:"Dominant order type",render:x=><Badge tone="good">{x.dominant}</Badge>},{key:"weakest",label:"Lowest active",render:x=><span className="weakMix">{x.weakest}</span>}
-              ]} totals={{day:"TOTAL",orders:num(+s.fulfilledInvoices),"Dine In":money(35247.7),Pickup:money(20262.85),Delivery:money(8657.5),Talabat:money(42549.7),Keeta:money(1455),total:money(+s.grossSales),dominant:"Talabat",weakest:"Keeta"}}/>
+              <MetricSelector value={mixMetric} onChange={setMixMetric}/>
+              <DataGrid id="weekday-order-mix" rows={weekdayOrderMix} renderExpanded={x=><MixDrill metric={mixMetric} paymentExceptions={paymentRecon?.exceptions} invoices={data.invoices.filter(i=>i.status==="Fulfilled"&&weekdayNames[invoiceDay(i).getDay()]===x.day)}/>} columns={[
+                {key:"day",label:"Weekday"},{key:"orders",label:"Total orders",numeric:true},{key:"Dine In",label:"Dine In",numeric:true,render:x=>mixValue(x["Dine In"])},{key:"Pickup",label:"Pickup",numeric:true,render:x=>mixValue(x.Pickup)},{key:"Delivery",label:"Delivery",numeric:true,render:x=>mixValue(x.Delivery)},{key:"Talabat",label:"Talabat",numeric:true,render:x=>mixValue(x.Talabat)},{key:"Keeta",label:"Keeta",numeric:true,render:x=>mixValue(x.Keeta)},{key:"total",label:mixLabel,numeric:true,render:x=>mixValue(x.total)},{key:"dominant",label:"Dominant order type",render:x=><Badge tone="good">{x.dominant}</Badge>},{key:"weakest",label:"Lowest active",render:x=><span className="weakMix">{x.weakest}</span>}
+              ]} totals={{day:"TOTAL",orders:num(+s.fulfilledInvoices),"Dine In":mixValue(weekdayOrderMix.reduce((a,x)=>a+x["Dine In"],0)),Pickup:mixValue(weekdayOrderMix.reduce((a,x)=>a+x.Pickup,0)),Delivery:mixValue(weekdayOrderMix.reduce((a,x)=>a+x.Delivery,0)),Talabat:mixValue(weekdayOrderMix.reduce((a,x)=>a+x.Talabat,0)),Keeta:mixValue(weekdayOrderMix.reduce((a,x)=>a+x.Keeta,0)),total:mixValue(weekdayOrderMix.reduce((a,x)=>a+x.total,0)),dominant:"Talabat",weakest:"Keeta"}}/>
               <Info title="Decision use" tone="blue">Click a weekday row to expand its order-type and payment mix from highest to lowest. Use this matrix to plan channel availability, kitchen capacity and promotions; it measures sales contribution, not profitability.</Info>
             </div>
           </section>
           <section className="analyticsGrid">
             <div className="panel wide" id="daily-insights"><div className="panelHead"><div><h3>Daily revenue trend · June 2026</h3><p>Day numbers run from 1 to 30; hover a point for the exact revenue.</p></div><Badge tone="good">30 DAYS</Badge></div>
-              <MetricLine rows={businessInsights.daily.map(x=>({...x,dayLabel:String(Number(x.date.slice(-2)))}))} valueKey="revenue" labelKey="dayLabel"/>
-              <DataGrid id="daily-performance" rows={businessInsights.daily} renderExpanded={x=><MixDrill invoices={invoicesForDay(x.date)}/>} columns={[
-                {key:"date",label:"June day",numeric:true,value:x=>Number(x.date.slice(-2)),render:x=>String(Number(x.date.slice(-2)))},{key:"day",label:"Day"},{key:"orders",label:"Orders",numeric:true},{key:"guests",label:"Guests",numeric:true,defaultVisible:false},{key:"revenue",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"vat",label:"VAT",numeric:true,defaultVisible:false,render:x=>money(x.vat)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)},{key:"firstActivity",label:"First bill",defaultVisible:false},{key:"lastActivity",label:"Last bill",defaultVisible:false},{key:"observedWindowMinutes",label:"Observed window",numeric:true,defaultVisible:false,render:x=>minutesLabel(x.observedWindowMinutes)}
-              ]} totals={{date:"TOTAL",orders:num(+s.fulfilledInvoices),guests:num(+s.totalGuests),revenue:money(+s.grossSales),discount:money(10461.25),vat:money(+s.vat),averageCheck:money(+s.averageCheck)}}/>
+              <MetricSelector value={mixMetric} onChange={setMixMetric}/>
+              <MetricLine rows={businessInsights.daily.map(x=>({...x,dayLabel:String(Number(x.date.slice(-2))),displayValue:biMetric(x)}))} valueKey="displayValue" labelKey="dayLabel"/>
+              <DataGrid id="daily-performance" rows={businessInsights.daily.map(x=>({...x,displayValue:biMetric(x)}))} renderExpanded={x=><MixDrill metric={mixMetric} paymentExceptions={paymentRecon?.exceptions} invoices={invoicesForDay(x.date)}/>} columns={[
+                {key:"date",label:"June day",numeric:true,value:x=>Number(x.date.slice(-2)),render:x=>String(Number(x.date.slice(-2)))},{key:"day",label:"Day"},{key:"orders",label:"Orders",numeric:true},{key:"guests",label:"Guests",numeric:true,defaultVisible:false},{key:"displayValue",label:mixLabel,numeric:true,render:x=>mixValue(x.displayValue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"vat",label:"VAT",numeric:true,defaultVisible:false,render:x=>money(x.vat)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)},{key:"firstActivity",label:"First bill",defaultVisible:false},{key:"lastActivity",label:"Last bill",defaultVisible:false},{key:"observedWindowMinutes",label:"Observed window",numeric:true,defaultVisible:false,render:x=>minutesLabel(x.observedWindowMinutes)}
+              ]} totals={{date:"TOTAL",orders:num(+s.fulfilledInvoices),guests:num(+s.totalGuests),displayValue:mixValue(biMetric({orders:+s.fulfilledInvoices,revenue:+s.grossSales,vat:+s.vat})),discount:money(10461.25),vat:money(+s.vat),averageCheck:money(+s.averageCheck)}}/>
             </div>
             <div className="panel wide compactWeekly" id="weekly-insights"><div className="panelHead"><div><h3>Week-by-week control</h3><p>Revenue, orders and discount pressure across the month · hover each point for detail.</p></div></div>
-              <MetricLine rows={businessInsights.weekly} valueKey="revenue" labelKey="week" color="#6d55a3"/>
-              <DataGrid id="weekly-performance" rows={businessInsights.weekly.map((x,i)=>({...x,weekNumber:`Week ${i+1}`}))} renderExpanded={x=><MixDrill invoices={invoicesForWeek(x.week)}/>} columns={[{key:"weekNumber",label:"Week no."},{key:"week",label:"Date range"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"revenue",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{weekNumber:"TOTAL",week:"June",days:"30",orders:num(+s.fulfilledInvoices),revenue:money(+s.grossSales),discount:money(10461.25),averageCheck:money(+s.averageCheck)}}/>
+              <MetricSelector value={mixMetric} onChange={setMixMetric}/>
+              <MetricLine rows={businessInsights.weekly.map(x=>({...x,displayValue:biMetric(x)}))} valueKey="displayValue" labelKey="week" color="#6d55a3"/>
+              <DataGrid id="weekly-performance" rows={businessInsights.weekly.map((x,i)=>({...x,weekNumber:`Week ${i+1}`,displayValue:biMetric(x)}))} renderExpanded={x=><MixDrill metric={mixMetric} paymentExceptions={paymentRecon?.exceptions} invoices={invoicesForWeek(x.week)}/>} columns={[{key:"weekNumber",label:"Week no."},{key:"week",label:"Date range"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"displayValue",label:mixLabel,numeric:true,render:x=>mixValue(x.displayValue)},{key:"discount",label:"Discounts",numeric:true,render:x=>money(x.discount)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{weekNumber:"TOTAL",week:"June",days:"30",orders:num(+s.fulfilledInvoices),displayValue:mixValue(biMetric({orders:+s.fulfilledInvoices,revenue:+s.grossSales,vat:+s.vat})),discount:money(10461.25),averageCheck:money(+s.averageCheck)}}/>
               <div className="operatingCards"><div><span>Longest observed billing window</span><b>{businessInsights.operatingHighlights.longestDay.date}</b><strong>{businessInsights.operatingHighlights.longestDay.firstActivity}–{businessInsights.operatingHighlights.longestDay.lastActivity}</strong></div><div><span>Shortest observed billing window</span><b>{businessInsights.operatingHighlights.shortestDay.date}</b><strong>{businessInsights.operatingHighlights.shortestDay.firstActivity}–{businessInsights.operatingHighlights.shortestDay.lastActivity}</strong></div><div><span>Highest revenue date</span><b>{businessInsights.operatingHighlights.bestRevenueDay.date}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div><div><span>Most orders / recorded guests</span><b>{businessInsights.operatingHighlights.bestOrderDay.date}</b><strong>{businessInsights.operatingHighlights.bestOrderDay.orders} / {businessInsights.operatingHighlights.bestGuestDay.guests}</strong></div></div>
               <Info title="Operating-hours limitation" tone="amber">First and last bill times show the observed transaction window, not staff attendance or official opening hours. Near-24-hour windows should trigger a business-date-cutoff review before labor decisions are made.</Info>
             </div>
