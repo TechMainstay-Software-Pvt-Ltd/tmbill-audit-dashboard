@@ -96,4 +96,4 @@
 .rankSearch{height:34px;display:flex;align-items:center;gap:7px;margin:0 0 10px;border:1px solid #d4e2db;border-radius:9px;padding:0 10px;background:#f8fbfa}.rankSearch span{color:#1d795a}.rankSearch input{border:0;outline:0;background:transparent;width:100%;font-size:8px;color:#173d32}.rankEmpty{font-size:8px;color:#8b3d37;text-align:center;padding:18px}
 @media(max-width:720px){.mealVisual{grid-template-columns:repeat(5,minmax(90px,1fr));overflow-x:auto}.zOrderControl>div{grid-template-columns:minmax(105px,1.2fr) repeat(3,minmax(72px,1fr))}}
 
-.dataGrid-meal-order-mix{margin-bottom:16px}.dataGrid-meal-order-mix .smartGrid{max-height:none}
+.dataGrid-meal-order-mix,.dataGrid-meal-weekday-mix{margin-bottom:16px}.dataGrid-meal-order-mix .smartGrid,.dataGrid-meal-weekday-mix .smartGrid{max-height:none}.dataGrid-meal-weekday-mix th:first-child,.dataGrid-meal-weekday-mix td:first-child{position:sticky;left:0;z-index:5}.dataGrid-meal-weekday-mix th:first-child{background:#173d32;color:#fff;z-index:7}
