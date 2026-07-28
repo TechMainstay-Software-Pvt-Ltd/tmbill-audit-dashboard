@@ -73,3 +73,14 @@
 .channelGroupLayout{display:grid;grid-template-columns:310px minmax(0,1fr);gap:14px;align-items:start}.channelGroupCards{display:grid;gap:10px}.channelGroupCards button{border:1px solid #d7e7df;background:linear-gradient(145deg,#f2faf6,#fff);border-radius:12px;padding:14px;text-align:left;color:#173d32;cursor:pointer}.channelGroupCards span,.channelGroupCards small,.channelGroupCards strong,.channelGroupCards b{display:block}.channelGroupCards span{font-size:10px;font-weight:900}.channelGroupCards small{font-size:7px;color:#6f827a;margin-top:3px}.channelGroupCards strong{font-size:17px;margin:10px 0}.channelGroupCards i{display:block;height:7px;background:#e2eee8;border-radius:7px;overflow:hidden}.channelGroupCards i em{display:block;height:100%;background:linear-gradient(90deg,#1b805e,#74be94);border-radius:7px}.channelGroupCards b{font-size:7px;color:#587168;margin-top:6px}.channelGroupCards button:nth-child(2) i em{background:linear-gradient(90deg,#d38226,#f2bd62)}
 
 @media(max-width:950px){.channelGroupLayout{grid-template-columns:1fr}.zExecutiveStrip{grid-template-columns:1fr 1fr}.zHead{gap:12px}.zTitleBrand{align-items:flex-start}}@media(max-width:600px){.brandLogoCrop{width:70px;flex-basis:70px}.zExecutiveStrip{grid-template-columns:1fr}.zHead,.zTitleBrand{flex-direction:column}}
+
+/* Use the supplied logo artwork intact; no positional crop or clipped wordmark. */
+.brandLogoCrop,.welcomeLogoCrop,.zLogoCrop,.receiptLogoCrop{display:flex;align-items:center;justify-content:center;overflow:visible;background:#fff}
+.brandLogoCrop img,.welcomeLogoCrop img,.zLogoCrop img,.receiptLogoCrop img{position:static;width:100%;height:100%;max-width:100%;object-fit:contain}
+.brandLogoCrop{height:52px}.welcomeLogoCrop{height:68px}.zLogoCrop{height:70px}.receiptLogoCrop{height:58px}
+.navCollapsed .brandLogoCrop{height:44px}.navCollapsed .brandLogoCrop img{position:static;width:100%;height:100%;object-fit:contain}
+
+.averageSequence button span{font-size:10px;font-weight:900;color:#173d32;min-height:28px;line-height:1.35}.averageSequence button b{font-size:14px;font-weight:950}.averageSequence button small{font-size:7px}.averageSequence button em{display:none}
+.navCollapsed .sidebar nav button>i{font-size:15px;color:#b9ffd8;text-shadow:0 0 8px #58dca6;font-weight:950}.navCollapsed .sidebar nav button{background:#1a493a;border:1px solid #386a59;margin-bottom:5px}.navCollapsed .sidebar nav button:hover,.navCollapsed .sidebar nav button.active{background:#26775b;color:#fff}
+.zeroValue{color:#111!important;font-weight:800}.mealPanel{border-color:#d8e7df}.dataGrid-meal-time-performance .smartGrid{max-height:none}
+.insightDownloads{display:flex;gap:6px}.insightDownloads a{background:#173d32;color:#fff;border-radius:8px;padding:8px 11px;text-decoration:none;font-size:8px;font-weight:900;white-space:nowrap}.insightDownloads a:last-child{background:#26775b}
