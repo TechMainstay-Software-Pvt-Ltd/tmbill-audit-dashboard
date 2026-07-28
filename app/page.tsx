@@ -32,7 +32,8 @@ type KotAudit={
 };
 type BusinessInsights={
   summary:Record<string,number>;turnaroundByType:any[];invoiceTurnaround:Record<string,any>;
-  turnaroundRows:any[];discountSummary:any[];discountDetails:any[];
+  turnaroundRows:any[];discountSummary:any[];discountDetails:any[];hourly:any[];daily:any[];
+  weekday:any[];weekly:any[];operatingHighlights:Record<string,any>;
 };
 
 function auditUploadedSalesRows(rows:any[][],fileName:string):SeparateAudit {
@@ -179,6 +180,11 @@ function minutesLabel(value:number|null|undefined) {
   if(value===null||value===undefined)return "Not captured";
   const hours=Math.floor(value/60),minutes=Math.round(value%60);
   return hours?`${hours}h ${minutes}m`:`${minutes} min`;
+}
+function MetricLine({rows,valueKey,labelKey,color="#187554"}:{rows:any[];valueKey:string;labelKey:string;color?:string}) {
+  const max=Math.max(1,...rows.map(x=>Number(x[valueKey]||0)));
+  const points=rows.map((x,i)=>`${rows.length===1?50:i/(rows.length-1)*100},${38-Number(x[valueKey]||0)/max*34}`).join(" ");
+  return <div className="metricLine"><svg viewBox="0 0 100 42" preserveAspectRatio="none" role="img"><path d="M0 38H100" className="axis"/><polyline points={points} fill="none" stroke={color} strokeWidth="1.7" vectorEffect="non-scaling-stroke"/>{rows.map((x,i)=><circle key={i} cx={rows.length===1?50:i/(rows.length-1)*100} cy={38-Number(x[valueKey]||0)/max*34} r=".9" fill={color}/>)}</svg><div>{rows.map((x,i)=><span key={i}>{String(x[labelKey]||"")}</span>)}</div></div>
 }
 function TenderValue({row,tender}:{row:any;tender:"card"|"cash"|"talabat"|"deliveroo"|"keeta"}) {
   const value=Number(row[tender]||0);
@@ -363,11 +369,16 @@ export default function Home() {
           <Kpi tone="bad" label="Category overstatement" value={money(+s.categoryOverstatement)} sub="Item export net exceeds invoice total"/>
         </section>
         <section className="twoCol">
-          <div className="panel"><div className="panelHead"><div><h3>Sales by order type</h3><p>These values reconcile exactly to gross sales.</p></div><Badge tone="good">PASS</Badge></div>
-            <div className="rankList">{orderTotals.map(([name,value,count])=><div className="rank" key={name}><div><b>{name}</b><span>{count} orders</span></div><div className="grow"><Bar value={value} max={42549.7}/></div><strong>{money(value)}</strong></div>)}</div>
+          <div className="panel"><div className="panelHead"><div><h3>June executive highlights</h3><p>The strongest operating signals from the reconciled invoice ledger.</p></div><Badge tone="good">CONTROLLED</Badge></div>
+            {businessInsights&&<div className="highlightList">
+              <div><span>Best revenue date</span><b>{businessInsights.operatingHighlights.bestRevenueDay.date}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div>
+              <div><span>Highest order volume</span><b>{businessInsights.operatingHighlights.bestOrderDay.date}</b><strong>{num(businessInsights.operatingHighlights.bestOrderDay.orders)} orders</strong></div>
+              <div><span>Peak revenue hour</span><b>{businessInsights.operatingHighlights.peakHour.label}</b><strong>{money(businessInsights.operatingHighlights.peakHour.revenue)}</strong></div>
+              <div><span>Strongest full week</span><b>{[...businessInsights.weekly].sort((a,b)=>b.revenue-a.revenue)[0]?.week}</b><strong>{money([...businessInsights.weekly].sort((a,b)=>b.revenue-a.revenue)[0]?.revenue||0)}</strong></div>
+            </div>}
           </div>
           <div className="panel"><div className="panelHead"><div><h3>Issue trace</h3><p>Start with the largest control failures.</p></div></div>
-            <button className="issueRow critical" onClick={()=>{setSelectedBill("2990");setTab("bills")}}><span>01</span><div><b>Malformed item line</b><small>Bill 2990 · Fattoush · negative taxable base</small></div><strong>Trace →</strong></button>
+            <button className="issueRow medium" onClick={()=>{setSelectedBill("2990");setTab("bills")}}><span>01</span><div><b>Complimentary control resolved</b><small>Bill 2990 · AED 13 Fattoush linked to actor, time and reason</small></div><strong>Trace →</strong></button>
             <button className="issueRow high" onClick={()=>setTab("payments")}><span>02</span><div><b>Incomplete split payments</b><small>Tax payment components short by AED 1,181.90</small></div><strong>Trace →</strong></button>
             <button className="issueRow medium" onClick={()=>setTab("categories")}><span>03</span><div><b>Category denominator mismatch</b><small>Percentages add to 106.29%, not 100%</small></div><strong>Trace →</strong></button>
           </div>
@@ -377,12 +388,57 @@ export default function Home() {
             <div className="turnaroundChart">{businessInsights.turnaroundByType.map(x=><button key={x.orderType} onClick={()=>{setOrderType(x.orderType);setTab("bills")}}><div><b>{x.orderType}</b><span>{num(x.orders)} timed orders · median {minutesLabel(x.medianMinutes)}</span></div><div className="timeTrack"><i style={{width:`${Math.min(100,x.averageMinutes/100*100)}%`}}/><em style={{left:`${Math.min(98,x.p90Minutes/180*100)}%`}} title={`P90 ${minutesLabel(x.p90Minutes)}`}/></div><strong>{minutesLabel(x.averageMinutes)}</strong></button>)}</div>
             <div className="chartLegend"><span><i className="avg"/>Average turnaround</span><span><i className="p90"/>P90 marker</span><span>{num(businessInsights.summary.over60)} orders exceeded 60 minutes</span></div>
           </div>
-          <div className="panel"><div className="panelHead"><div><h3>Supply mix × collection mix</h3><p>Two views of the same AED 108,172.75 control total—not a one-to-one tender mapping.</p></div><Badge tone="good">RECONCILED</Badge></div>
-            <div className="mixCompare"><h4>Sales by order type</h4>{orderTotals.map(([name,value,count],i)=><button key={name} onClick={()=>{setOrderType(name);setTab("bills")}}><span>{name}<small>{count} orders</small></span><div><i className={`mix${i}`} style={{width:`${value/+s.grossSales*100}%`}}/></div><b>{(value/+s.grossSales*100).toFixed(1)}%</b><strong>{money(value)}</strong></button>)}
-              <h4>Collections by payment mode</h4>{paymentTotals.map(([name,value,count],i)=><button key={name} onClick={()=>setTab("payments")}><span>{name}<small>{count} allocations</small></span><div><i className={`pay${i}`} style={{width:`${value/+s.grossSales*100}%`}}/></div><b>{(value/+s.grossSales*100).toFixed(1)}%</b><strong>{money(value)}</strong></button>)}</div>
+          <div className="panel"><div className="panelHead"><div><h3>Supply mix × collection mix</h3><p>Sortable controls with fixed totals for two dimensions of AED 108,172.75.</p></div><Badge tone="good">RECONCILED</Badge></div>
+            <h4 className="mixTableTitle">Sales by order type</h4><DataGrid id="overview-order-mix" rows={orderTotals.map(([name,value,count])=>({name,value,count,mix:value/+s.grossSales*100}))} onRowClick={x=>{setOrderType(x.name);setTab("bills")}} columns={[
+              {key:"name",label:"Order type"},{key:"count",label:"Orders",numeric:true},{key:"value",label:"Sales",numeric:true,render:x=>money(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
+            ]} totals={{name:"TOTAL",count:num(+s.fulfilledInvoices),value:money(+s.grossSales),mix:"100.0%"}}/>
+            <h4 className="mixTableTitle">Collections by payment mode</h4><DataGrid id="overview-payment-mix" rows={paymentTotals.map(([name,value,count])=>({name,value,count,mix:value/+s.grossSales*100}))} onRowClick={()=>setTab("payments")} columns={[
+              {key:"name",label:"Payment mode"},{key:"count",label:"Allocations",numeric:true},{key:"value",label:"Collected",numeric:true,render:x=>money(x.value)},{key:"mix",label:"Mix %",numeric:true,render:x=><span className="miniMix payment"><i style={{width:`${x.mix}%`}}/><b>{x.mix.toFixed(1)}%</b></span>}
+            ]} totals={{name:"TOTAL",count:"1,831",value:money(+s.grossSales),mix:"100.0%"}}/>
             <Info title="How to read this" tone="blue">Order type explains where the sale occurred; payment mode explains how it was collected. Talabat and Keeta should usually align, while Dine In, Pickup and Delivery normally split across Card and Cash. Split tenders require multiple allocation rows.</Info>
           </div>
         </section>}
+        {businessInsights&&<>
+          <section className="analyticsGrid">
+            <div className="panel wide"><div className="panelHead"><div><h3>Hourly sales curve</h3><p>Fulfilled revenue by invoice hour · complete AED 108,172.75 coverage.</p></div><Badge tone="good">Peak {businessInsights.operatingHighlights.peakHour.label}</Badge></div>
+              <div className="hourBars">{businessInsights.hourly.map(x=><div key={x.hour} title={`${x.label}: ${money(x.revenue)} · ${x.orders} orders`}><span><i style={{height:`${x.revenue/Math.max(...businessInsights.hourly.map(h=>h.revenue))*100}%`}}/></span><small>{x.hour%3===0?x.label.replace(" ",""):""}</small></div>)}</div>
+            </div>
+            <div className="panel"><div className="panelHead"><div><h3>Weekday revenue performance</h3><p>Average daily revenue removes the unequal number of weekdays in June.</p></div></div>
+              <MetricLine rows={businessInsights.weekday} valueKey="averageDailyRevenue" labelKey="day" color="#d08b22"/>
+              <DataGrid id="weekday-performance" rows={businessInsights.weekday} columns={[{key:"day",label:"Day"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"averageDailyRevenue",label:"Avg daily revenue",numeric:true,render:x=>money(x.averageDailyRevenue)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{day:"TOTAL / AVG",days:"30",orders:num(+s.fulfilledInvoices),averageDailyRevenue:money(+s.grossSales/30),averageCheck:money(+s.averageCheck)}}/>
+            </div>
+          </section>
+          <section className="analyticsGrid">
+            <div className="panel"><div className="panelHead"><div><h3>Daily revenue trend</h3><p>Click headers in the table below to identify strongest and weakest dates.</p></div><Badge tone="good">30 DAYS</Badge></div>
+              <MetricLine rows={businessInsights.daily} valueKey="revenue" labelKey="date"/>
+              <DataGrid id="daily-performance" rows={businessInsights.daily} columns={[
+                {key:"date",label:"Business date"},{key:"day",label:"Day"},{key:"orders",label:"Orders",numeric:true},{key:"guests",label:"Guests",numeric:true},{key:"revenue",label:"Revenue",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discount",numeric:true,render:x=>money(x.discount)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)},{key:"firstActivity",label:"First bill"},{key:"lastActivity",label:"Last bill"},{key:"observedWindowMinutes",label:"Observed window",numeric:true,render:x=>minutesLabel(x.observedWindowMinutes)}
+              ]} totals={{date:"TOTAL",orders:num(+s.fulfilledInvoices),guests:num(+s.totalGuests),revenue:money(+s.grossSales),discount:money(10461.25),vat:money(+s.vat),averageCheck:money(+s.averageCheck)}}/>
+            </div>
+            <div className="panel"><div className="panelHead"><div><h3>Week-by-week control</h3><p>Revenue, orders and discount pressure across the month.</p></div></div>
+              <MetricLine rows={businessInsights.weekly} valueKey="revenue" labelKey="week" color="#6d55a3"/>
+              <DataGrid id="weekly-performance" rows={businessInsights.weekly} columns={[{key:"week",label:"Week"},{key:"days",label:"Days",numeric:true},{key:"orders",label:"Orders",numeric:true},{key:"revenue",label:"Revenue",numeric:true,render:x=>money(x.revenue)},{key:"discount",label:"Discount",numeric:true,render:x=>money(x.discount)},{key:"averageCheck",label:"Avg check",numeric:true,render:x=>money(x.averageCheck)}]} totals={{week:"TOTAL",days:"30",orders:num(+s.fulfilledInvoices),revenue:money(+s.grossSales),discount:money(10461.25),averageCheck:money(+s.averageCheck)}}/>
+              <div className="operatingCards"><div><span>Longest observed billing window</span><b>{businessInsights.operatingHighlights.longestDay.date}</b><strong>{businessInsights.operatingHighlights.longestDay.firstActivity}–{businessInsights.operatingHighlights.longestDay.lastActivity}</strong></div><div><span>Shortest observed billing window</span><b>{businessInsights.operatingHighlights.shortestDay.date}</b><strong>{businessInsights.operatingHighlights.shortestDay.firstActivity}–{businessInsights.operatingHighlights.shortestDay.lastActivity}</strong></div><div><span>Highest revenue date</span><b>{businessInsights.operatingHighlights.bestRevenueDay.date}</b><strong>{money(businessInsights.operatingHighlights.bestRevenueDay.revenue)}</strong></div><div><span>Most orders / recorded guests</span><b>{businessInsights.operatingHighlights.bestOrderDay.date}</b><strong>{businessInsights.operatingHighlights.bestOrderDay.orders} / {businessInsights.operatingHighlights.bestGuestDay.guests}</strong></div></div>
+              <Info title="Operating-hours limitation" tone="amber">First and last bill times show the observed transaction window, not staff attendance or official opening hours. Near-24-hour windows should trigger a business-date-cutoff review before labor decisions are made.</Info>
+            </div>
+          </section>
+          <section className="threeCol protectionGrid">
+            <div className="panel"><div className="panelHead"><div><h3>Revenue leakage radar</h3><p>Commercial concessions and operational reversals.</p></div><Badge tone="bad">WATCH</Badge></div>
+              <div className="leakageRows"><button onClick={()=>setTab("discounts")}><span>Unified discounts</span><b>{money(businessInsights.summary.unifiedDiscount)}</b><small>{(businessInsights.summary.unifiedDiscount/(+s.correctedGrossBeforeDiscount)*100).toFixed(1)}% of original item gross</small></button><button onClick={()=>setTab("operations")}><span>Cancelled KOT list value</span><b>{money(kotAudit?.summary.cancelledListValue||0)}</b><small>{num(kotAudit?.summary.cancelledLines||0)} cancelled lines</small></button><button onClick={()=>setTab("operations")}><span>Edited KOT lines</span><b>{num(kotAudit?.summary.editedLines||0)}</b><small>Previous/new values not exported</small></button><button onClick={()=>setTab("payments")}><span>Unallocated payments</span><b>{money(+s.paymentComponentGap)}</b><small>Reporting allocation gap—not lost revenue</small></button></div>
+            </div>
+            <div className="panel"><div className="panelHead"><div><h3>Top items by quantity</h3><p>Demand and kitchen-volume leaders.</p></div></div><div className="rankList">{[...data.topItems].sort((a,b)=>b.qty-a.qty).slice(0,10).map(x=><div className="rank" key={x.name}><div><b>{x.name}</b><span>{num(x.qty)} sold</span></div><div className="grow"><Bar value={x.qty} max={Math.max(...data.topItems.map(y=>y.qty))}/></div><strong>{money(x.net)}</strong></div>)}</div></div>
+            <div className="panel"><div className="panelHead"><div><h3>Top items by revenue</h3><p>Realized sales after allocated discounts.</p></div></div><div className="rankList">{data.topItems.slice(0,10).map(x=><div className="rank" key={x.name}><div><b>{x.name}</b><span>{num(x.qty)} sold</span></div><div className="grow"><Bar value={x.net} max={data.topItems[0]?.net||1} color="#d28e25"/></div><strong>{money(x.net)}</strong></div>)}</div></div>
+          </section>
+          <section className="panel controllerActions"><div className="panelHead"><div><h3>Controller recommendations from June performance</h3><p>Prioritized actions based on revenue, speed, concessions and control quality.</p></div><Badge tone="warn">ACTION PLAN</Badge></div><div className="actionGrid">
+            <article><span>01 · Protect peak capacity</span><h4>Friday leads average daily revenue</h4><p>Average Friday revenue is {money([...businessInsights.weekday].sort((a,b)=>b.averageDailyRevenue-a.averageDailyRevenue)[0]?.averageDailyRevenue||0)}. Protect stock, kitchen labor and aggregator availability around the 2 PM revenue peak.</p></article>
+            <article><span>02 · Repair delivery speed</span><h4>Delivery averages {minutesLabel(businessInsights.turnaroundByType.find(x=>x.orderType==="Delivery")?.averageMinutes)}</h4><p>This is substantially slower than Pickup at {minutesLabel(businessInsights.turnaroundByType.find(x=>x.orderType==="Pickup")?.averageMinutes)}. Split kitchen preparation, dispatch waiting and driver travel timestamps before assigning responsibility.</p></article>
+            <article><span>03 · Govern concessions</span><h4>Discount pressure is {(businessInsights.summary.unifiedDiscount/(+s.correctedGrossBeforeDiscount)*100).toFixed(1)}%</h4><p>Review discount title × reason × user weekly. Separate promotional investment, approved complimentary service recovery and unauthorized leakage.</p></article>
+            <article><span>04 · Classify cancellations</span><h4>{num(kotAudit?.summary.cancelledLines||0)} KOT cancellations require cause codes</h4><p>Distinguish customer change, duplicate punch, stock-out, kitchen delay and system error. Eight current events have no reason and every cancellation needs an action timestamp and approver.</p></article>
+            <article><span>05 · Fix guest analytics</span><h4>Recorded guests closely mirror order count</h4><p>This suggests cover counts are not consistently maintained. Average-per-person and client-volume decisions should remain provisional until dine-in covers and customer identities are captured accurately.</p></article>
+            <article><span>06 · Do not claim profit yet</span><h4>Revenue performance is not profitability</h4><p>Add recipe cost, packaging, aggregator commission and labor allocation. Then calculate contribution margin by item, order type, hour and business day.</p></article>
+          </div></section>
+          <Info title="Profitability boundary" tone="red">The dashboard can rank revenue, quantity, discounts, cancellations and contribution-risk indicators. It cannot call a day or item “most profitable” until recipe quantities, ingredient costs, packaging, aggregator commissions and labor allocation are configured. For now, “best-performing” means highest controlled revenue—not accounting profit.</Info>
+        </>}
         <Info title="What this means" tone="blue">The dashboard headline, order-type, tax, discount and staff totals are reliable. Category mix, item revenue, split-payment exports and inventory profit metrics need redesign before they should guide decisions.</Info>
       </>}
 
