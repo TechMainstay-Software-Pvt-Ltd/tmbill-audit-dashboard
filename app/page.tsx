@@ -78,19 +78,19 @@ const money = (v:number) => new Intl.NumberFormat("en-AE",{style:"currency",curr
 const num = (v:number) => new Intl.NumberFormat("en-AE").format(v);
 
 const reportSpecs = [
- ["Sales / Z Summary","Branch × business date × shift","The master financial control: gross sales, net ex VAT, VAT, discounts, charges, paid, due and variance."],
+ ["Sales / Z Summary","Branch × business date × shift","The master financial control using the standardized sales bridge from Gross Item Sales to Actual Sales incl. VAT."],
  ["Cash Audit","Drawer × cashier × shift","Opening float through counted cash, with every cash movement and variance."],
  ["Order Type Summary","Period × order type","Dine-in, pickup, delivery and aggregator mix using the same canonical invoice sales."],
  ["Payment Type Summary","Period × tender","One row per tender allocation, including every part of split payments."],
- ["Discount Summary","Rule × reason × user","Item and order discounts, eligibility, effective rate and approval exceptions."],
+ ["Discount Summary","Rule × reason × user","Discounts and Complimentary shown separately, with eligibility, reason, user and approval exceptions."],
  ["Expense Summary","Expense transaction","Operational expense, input VAT, payment method, approval and reference."],
  ["Bill Summary","One row per invoice","The single invoice ledger from which all financial summaries are produced."],
  ["Delivery Boy Summary","Period × delivery employee","Orders, sales, delivery time, cash collections and handover variance."],
  ["Waiter Summary","Period × waiter","Bills, guests, average check, voids, tips and table turns."],
- ["Product Group Summary","Period × product group","Gross, discounts, net inclusive VAT, VAT, net ex VAT and mix."],
+ ["Product Group Summary","Period × product group","Gross Item Sales, Discounts, Complimentary, Net Item Sales incl./excl. VAT and mix."],
  ["Kitchen Department Summary","Period × kitchen","Production quantity, value, cancellations, preparation time and late tickets."],
- ["Category Summary","Period × category","Canonical line sales after allocated discounts; must sum to the item-sales control."],
- ["Sold Items Summary","Item × order type","Quantity, realized price, effective menu price, discounts, VAT and price variance."],
+ ["Category Summary","Period × category","The standardized sales bridge by category; totals plus Charges incl. VAT must equal Actual Sales incl. VAT."],
+ ["Sold Items Summary","Item × order type","The standardized sales bridge by item and order type, with realized price and menu-price variance."],
  ["Cancel Items Summary","One status event","Invoice/item/KOT identity, original value, actor, approver, reason and time."],
  ["Wallet Summary","One wallet event","Credits, debits, expiry, invoice reference and liability balance."],
  ["Due Payment Received","One receipt allocation","Receipt against original invoice with tender, reference and remaining balance."],
@@ -100,26 +100,26 @@ const reportSpecs = [
  ["Order Source Summary","Period × source","Channel economics, cancellations, discounts, check average and settlement variance."]
 ];
 const reportHeaders:Record<string,string[]> = {
- "Sales / Z Summary":["Business date","Shift","Bills","Gross items","Discount","Charges","VAT","Gross sales","Paid","Due","Variance"],
+ "Sales / Z Summary":["Business date","Shift","Bills","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Charges incl. VAT","Actual Sales incl. VAT","Paid","Due","Variance"],
  "Cash Audit":["Shift","Drawer","Cashier","Opening float","Cash sales","Due received","Expenses","Expected","Counted","Variance"],
- "Order Type Summary":["Order type","Bills","Guests","Gross items","Discount","Charges","VAT","Gross sales","Average check","Mix %"],
+ "Order Type Summary":["Order type","Bills","Guests","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Charges incl. VAT","Actual Sales incl. VAT","Average check","Mix %"],
  "Payment Type Summary":["Tender","Allocations","Invoices","Collected","Refunds","Net collected","Mix %","Variance"],
- "Discount Summary":["Discount","Level","Reason","User","Bills","Eligible gross","Discount","Effective %","Exceptions"],
+ "Discount Summary":["Title","Classification","Reason","User","Bills","Eligible Gross","Amount","Effective %","Exceptions"],
  "Expense Summary":["Date","Expense ID","Category","Supplier","Net","Input VAT","Gross","Tender","Approver","Status"],
- "Bill Summary":["Bill","Order ID","Supply time","Status","Order type","Subtotal","Discount","Charges","VAT","Total","Paid","Due"],
- "Delivery Boy Summary":["Driver","Orders","Delivered","Cancelled","Sales","Cash collected","Due","Avg minutes","Late %","Variance"],
- "Waiter Summary":["Waiter","Bills","Guests","Sales","Discount","Average check","Voids","Tips","Table turns"],
- "Product Group Summary":["Product group","Qty","Gross","Item discount","Order discount","Net incl VAT","VAT","Net ex VAT","Mix %"],
- "Kitchen Department Summary":["Kitchen","Tickets","Lines","Qty","Net sales","Cancelled qty","Cancel value","Avg prep","Late %"],
- "Category Summary":["Category","Qty","Gross","Item discount","Order discount","Net incl VAT","VAT","Net ex VAT","Mix %"],
- "Sold Items Summary":["SKU","Item","Order type","Qty","Menu price","Actual price","Discount","Net","VAT","Price variance"],
+ "Bill Summary":["Bill","Order ID","Supply time","Status","Order type","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Charges incl. VAT","Actual Sales incl. VAT","Paid","Due"],
+ "Delivery Boy Summary":["Driver","Orders","Delivered","Cancelled","Actual Sales incl. VAT","Cash collected","Due","Avg minutes","Late %","Variance"],
+ "Waiter Summary":["Waiter","Bills","Guests","Actual Sales incl. VAT","Discounts","Average check","Voids","Tips","Table turns"],
+ "Product Group Summary":["Product group","Qty","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Mix %"],
+ "Kitchen Department Summary":["Kitchen","Tickets","Lines","Qty","Net Item Sales incl. VAT","Cancelled qty","Cancel value","Avg prep","Late %"],
+ "Category Summary":["Category","Qty","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Mix %"],
+ "Sold Items Summary":["SKU","Item","Order type","Qty","Menu price","Actual price","Gross Item Sales","Discounts","Complimentary","Net Item Sales incl. VAT","VAT","Net Item Sales excl. VAT","Price variance"],
  "Cancel Items Summary":["Event","Time","Invoice","KOT","Item","Qty","Original value","From","To","Reason","User","Approver"],
  "Wallet Summary":["Event","Time","Wallet","Type","Invoice","Credit","Debit","Expiry","Balance","Status"],
  "Due Payment Received":["Receipt","Received at","Invoice","Customer","Opening due","Received","Tender","Reference","Remaining"],
  "Due Payment Receivable":["Invoice","Supply date","Customer","Gross","Paid","Receipts","Credits","Open due","Age","Bucket"],
  "Payment Variance":["Date","Tender/source","POS net","Processor net","Fees","Expected deposit","Actual","Timing","Variance","Owner"],
  "Currency Denominations":["Date","Shift","Drawer","Currency","Denomination","Quantity","Amount","Counter","Verifier"],
- "Order Source Summary":["Source","Orders","Fulfilled","Cancelled","Discount","Charges","VAT","Sales","Average check","Cancel %","Mix %"]
+ "Order Source Summary":["Source","Orders","Fulfilled","Cancelled","Discounts","Complimentary","Charges incl. VAT","VAT","Actual Sales incl. VAT","Average check","Cancel %","Mix %"]
 };
 const paymentMatrix=[
  {orderType:"Dine In",orders:684,card:29428.20,cash:5702.50,talabat:117,deliveroo:0,keeta:0,vat:1676.78,sales:35247.70,exported:34371.80},
@@ -160,13 +160,21 @@ function Badge({tone="neutral",children}:{tone?:string;children:React.ReactNode}
 function Kpi({label,value,sub,tone="good"}:{label:string;value:string;sub:string;tone?:string}) {
   return <article className={`kpi ${tone}`}><div className="kpiLabel">{label}</div><div className="kpiValue">{value}</div><div className="kpiSub">{sub}</div></article>
 }
-function SalesReconciliation({itemSales,charges,actualSales}:{itemSales:number;charges:number;actualSales:number}) {
-  const reconciled=+(itemSales+charges).toFixed(2);
+function SalesReconciliation({grossItems,totalReductions,complimentary,vat,charges,actualSales}:{grossItems:number;totalReductions:number;complimentary:number;vat:number;charges:number;actualSales:number}) {
+  const discounts=+(totalReductions-complimentary).toFixed(2);
+  const netItemsInclVat=+(grossItems-discounts-complimentary).toFixed(2);
+  const netItemsExVat=+(netItemsInclVat-vat).toFixed(2);
+  const reconciled=+(netItemsInclVat+charges).toFixed(2);
   const variance=+(reconciled-actualSales).toFixed(2);
   return <div className="reportReconciliation" aria-label="Report to actual sales reconciliation">
-    <div><span>Item sales after discounts · incl. VAT</span><b>{money(itemSales)}</b></div><i>+</i>
-    <div><span>Invoice charges</span><b>{money(charges)}</b></div><i>=</i>
-    <div className="reconciledTotal"><span>Reconciled actual sales</span><b>{money(reconciled)}</b></div>
+    <div><span>Gross Item Sales</span><b>{money(grossItems)}</b><small>Before reductions</small></div><i>−</i>
+    <div><span>Discounts</span><b>{money(discounts)}</b><small>Order and promotional reductions</small></div><i>−</i>
+    <div><span>Complimentary</span><b>{money(complimentary)}</b><small>Authorized free items</small></div><i>=</i>
+    <div><span>Net Item Sales incl. VAT</span><b>{money(netItemsInclVat)}</b></div>
+    <div><span>VAT included</span><b>{money(vat)}</b><small>Disclosure only; do not deduct again from Actual Sales</small></div>
+    <div><span>Net Item Sales excl. VAT</span><b>{money(netItemsExVat)}</b></div><i>+</i>
+    <div><span>Charges incl. VAT</span><b>{money(charges)}</b></div><i>=</i>
+    <div className="reconciledTotal"><span>Actual Sales incl. VAT</span><b>{money(reconciled)}</b></div>
     <div className={Math.abs(variance)<=.01?"reconPass":"reconFail"}><span>Variance to invoice sales</span><b>{money(variance)}</b><small>{Math.abs(variance)<=.01?"Matched":"Review required"}</small></div>
   </div>
 }
@@ -426,7 +434,7 @@ export default function Home() {
           </section>
           <section className="threeCol protectionGrid" id="protection-insights">
             <div className="panel"><div className="panelHead"><div><h3>Revenue leakage radar</h3><p>Commercial concessions and operational reversals.</p></div><Badge tone="bad">WATCH</Badge></div>
-              <div className="leakageRows"><button onClick={()=>setTab("discounts")}><span>Unified discounts</span><b>{money(businessInsights.summary.unifiedDiscount)}</b><small>{(businessInsights.summary.unifiedDiscount/(+s.correctedGrossBeforeDiscount)*100).toFixed(1)}% of original item gross</small></button><button onClick={()=>setTab("operations")}><span>Cancelled KOT list value</span><b>{money(kotAudit?.summary.cancelledListValue||0)}</b><small>{num(kotAudit?.summary.cancelledLines||0)} cancelled lines</small></button><button onClick={()=>setTab("operations")}><span>Edited KOT lines</span><b>{num(kotAudit?.summary.editedLines||0)}</b><small>Previous/new values not exported</small></button><button onClick={()=>setTab("payments")}><span>Unallocated payments</span><b>{money(+s.paymentComponentGap)}</b><small>Reporting allocation gap—not lost revenue</small></button></div>
+            <div className="leakageRows"><button onClick={()=>setTab("discounts")}><span>Total reductions</span><b>{money(businessInsights.summary.unifiedDiscount)}</b><small>Discounts plus separately titled Complimentary</small></button><button onClick={()=>setTab("operations")}><span>Cancelled KOT list value</span><b>{money(kotAudit?.summary.cancelledListValue||0)}</b><small>{num(kotAudit?.summary.cancelledLines||0)} cancelled lines</small></button><button onClick={()=>setTab("operations")}><span>Edited KOT lines</span><b>{num(kotAudit?.summary.editedLines||0)}</b><small>Previous/new values not exported</small></button><button onClick={()=>setTab("payments")}><span>Unallocated payments</span><b>{money(+s.paymentComponentGap)}</b><small>Reporting allocation gap—not lost revenue</small></button></div>
             </div>
             <div className="panel"><div className="panelHead"><div><h3>Top items by quantity</h3><p>Demand and kitchen-volume leaders.</p></div></div><div className="rankList">{[...data.topItems].sort((a,b)=>b.qty-a.qty).slice(0,10).map(x=><div className="rank" key={x.name}><div><b>{x.name}</b><span>{num(x.qty)} sold</span></div><div className="grow"><Bar value={x.qty} max={Math.max(...data.topItems.map(y=>y.qty))}/></div><strong>{money(x.net)}</strong></div>)}</div></div>
             <div className="panel"><div className="panelHead"><div><h3>Top items by revenue</h3><p>Realized sales after allocated discounts.</p></div></div><div className="rankList">{data.topItems.slice(0,10).map(x=><div className="rank" key={x.name}><div><b>{x.name}</b><span>{num(x.qty)} sold</span></div><div className="grow"><Bar value={x.net} max={data.topItems[0]?.net||1} color="#d28e25"/></div><strong>{money(x.net)}</strong></div>)}</div></div>
@@ -508,8 +516,8 @@ export default function Home() {
       </section>}
 
       {tab==="discounts"&&<>
-        {businessInsights&&<><section className="kpiGrid compact"><Kpi label="Order / invoice discounts" value={money(businessInsights.summary.invoiceDiscount)} sub="587 fulfilled invoices · Sales Report components"/><Kpi label="Confirmed complimentary" value={money(businessInsights.summary.itemComplimentary)} sub="Fattoush on #2990 · item-level authorization" tone="warn"/><Kpi label="Unified discounts" value={money(businessInsights.summary.unifiedDiscount)} sub="Order/invoice + item complimentary"/><Kpi label="Discount evidence rows" value={num(businessInsights.discountDetails.length)} sub="Title, reason, user, bill and source linked"/></section>
-        <Info title="Corrected interpretation of the AED 13" tone="blue">The AED 13 is not an unresolved variance. It is a confirmed complimentary Fattoush on bill #2990. The Sales Report stores the bill subtotal after that item was reduced to zero and separately records the 10% “Al Zaeem” order discount of AED 8.10. The Complimentary Items and KOT Item-wise reports provide the item title, user, timestamp and reason. The unified discount control is therefore AED 10,461.25 invoice/order discounts + AED 13.00 complimentary = AED 10,474.25.</Info>
+        {businessInsights&&<><section className="kpiGrid compact"><Kpi label="Discounts" value={money(businessInsights.summary.invoiceDiscount)} sub="Order and promotional reductions · 587 fulfilled invoices"/><Kpi label="Complimentary" value={money(businessInsights.summary.itemComplimentary)} sub="Fattoush on #2990 · authorized reason retained" tone="warn"/><Kpi label="Total reductions" value={money(businessInsights.summary.unifiedDiscount)} sub="Discounts + Complimentary"/><Kpi label="Reduction evidence rows" value={num(businessInsights.discountDetails.length)} sub="Title, reason, user, bill and source linked"/></section>
+        <Info title="Standard treatment of the AED 13" tone="blue">The AED 13 is classified only as <b>Complimentary</b>, not as a normal discount. It is the Fattoush on bill #2990 with its recorded reason, actor and timestamp. The separate 10% “Al Zaeem” order discount is AED 8.10 and must exclude the complimentary line from its eligible base. Total reductions are therefore AED 10,461.25 Discounts + AED 13.00 Complimentary = AED 10,474.25.</Info>
         <section className="panel"><div className="panelHead"><div><h3>Discount title × reason summary</h3><p>Linked from Sales Report discount components and the confirmed complimentary event.</p></div><Badge tone="good">LINKED</Badge></div>
           <DataGrid id="discount-summary-linked" rows={businessInsights.discountSummary} columns={[
             {key:"title",label:"Discount title"},{key:"reason",label:"Recorded reason"},{key:"level",label:"Level"},{key:"bills",label:"Bills",numeric:true},{key:"amount",label:"Discount amount",numeric:true,render:x=>money(x.amount)},{key:"users",label:"Users"},{key:"sources",label:"Evidence source"}
@@ -656,8 +664,8 @@ export default function Home() {
         <section className="zSheet"><div className="zHead"><div><span>TAX / MANAGEMENT CONTROL REPORT</span><h2>Morbido Express Restaurant</h2><p>The SS · 01 Jun 2026 12:45 PM – 30 Jun 2026 11:58 PM</p></div><Badge tone="good">CLOSED · RECONCILED</Badge></div>
           <div className="zMeta"><div><span>First / last bill</span><b>#2313 – #4141</b></div><div><span>Fulfilled bills</span><b>1,816</b></div><div><span>Cancelled bills</span><b>13 · {money(1094.50)}</b></div><div><span>Guests</span><b>1,817</b></div></div>
           <section className="zBlock"><h3>Sales and VAT bridge</h3>{[
-            ["Original item gross",118066],["Less: item discounts",-13],["Less: order discounts",-10461.25],["Taxable item sales incl VAT",107591.75],["Net taxable sales ex VAT",102466.82],["Output VAT – canonical lines",5124.93],["TMBill reported output VAT",5124.92],["VAT rounding control",-0.01],["Charges collected",581],["TOTAL REVENUE",108172.75]
-          ].map(([n,v])=><div className={n==="TOTAL REVENUE"?"grand":""} key={n as string}><span>{n}</span><b>{money(v as number)}</b></div>)}</section>
+            ["Gross Item Sales",118066],["Less: Discounts",-10461.25],["Less: Complimentary",-13],["Net Item Sales incl. VAT",107591.75],["VAT included",5124.92],["Net Item Sales excl. VAT",102466.83],["Charges incl. VAT",581],["ACTUAL SALES incl. VAT",108172.75]
+          ].map(([n,v])=><div className={n==="ACTUAL SALES incl. VAT"?"grand":""} key={n as string}><span>{n}</span><b>{money(v as number)}</b></div>)}</section>
           <div className="zColumns"><section className="zBlock"><h3>Order types</h3>{paymentMatrix.map(x=><div key={x.orderType}><span>{x.orderType} ({x.orders})</span><b>{money(x.sales)}</b></div>)}<div className="grand"><span>Total</span><b>{money(108172.75)}</b></div></section>
           <section className="zBlock"><h3>Payment tenders</h3>{paymentTotals.map(([n,v,c])=><div key={n}><span>{n} ({c})</span><b>{money(v)}</b></div>)}<div className="grand"><span>Total</span><b>{money(108172.75)}</b></div></section></div>
           <section className="zBlock"><h3>Required review controls</h3><div><span>Confirmed item/order conflict</span><b>#2990 · corrected</b></div><div><span>Discount allocation rounding</span><b>6 invoices</b></div><div><span>VAT line rounding</span><b>252 invoices · max AED 0.02</b></div><div><span>Tax-payment allocation shortfall</span><b>{money(1181.90)}</b></div><div><span>Charges without charge VAT</span><b>{money(581)}</b></div></section>
@@ -695,41 +703,43 @@ export default function Home() {
       </>}
 
       {tab==="categories"&&<>
-        <section className="hero slim"><div><Badge tone="good">Corrected canonical category view</Badge><h2>Every category now uses actual transaction prices and allocated discounts.</h2><p>Original line gross is reduced by item discount and eligible allocated order discount, then divided into VAT and net revenue.</p></div><div className="heroScore"><b>{money(+s.taxableGrossInclVat)}</b><span>corrected item sales incl VAT</span><small>Charges shown separately: {money(+s.charges)}</small></div></section>
+        <section className="hero slim"><div><Badge tone="good">Standardized category sales bridge</Badge><h2>Every category uses the same governed sales vocabulary.</h2><p>Gross Item Sales − Discounts − Complimentary = Net Item Sales incl. VAT. VAT is disclosed separately; Charges incl. VAT are then added to reach Actual Sales incl. VAT.</p></div><div className="heroScore"><b>{money(+s.taxableGrossInclVat)}</b><span>Net Item Sales incl. VAT</span><small>Charges incl. VAT: {money(+s.charges)}</small></div></section>
         <DataGrid id="category-ledger" rows={data.categories} columns={[
-          {key:"name",label:"Category"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Original gross",numeric:true,render:x=>money(x.gross)},{key:"itemDiscount",label:"Item discount",numeric:true,render:x=>money(x.itemDiscount)},{key:"orderDiscount",label:"Order discount",numeric:true,render:x=>money(x.orderDiscount)},{key:"discount",label:"Total discount",numeric:true,render:x=>money(x.discount)},{key:"net",label:"Sold incl VAT",numeric:true,render:x=>money(x.net)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Sold ex VAT",numeric:true,render:x=>money(x.netExVat)},{key:"mix",label:"Mix %",numeric:true,value:x=>x.net/+s.taxableGrossInclVat*100,render:x=>`${(x.net/+s.taxableGrossInclVat*100).toFixed(2)}%`}
+          {key:"name",label:"Category"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Gross Item Sales",numeric:true,render:x=>money(x.gross)},{key:"orderDiscount",label:"Discounts",numeric:true,render:x=>money(x.orderDiscount)},{key:"itemDiscount",label:"Complimentary",numeric:true,render:x=>money(x.itemDiscount)},{key:"net",label:"Net Item Sales incl. VAT",numeric:true,render:x=>money(x.net)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Net Item Sales excl. VAT",numeric:true,render:x=>money(x.netExVat)},{key:"mix",label:"Mix %",numeric:true,value:x=>x.net/+s.taxableGrossInclVat*100,render:x=>`${(x.net/+s.taxableGrossInclVat*100).toFixed(2)}%`}
         ]} totals={{name:"TOTAL",qty:num(data.categories.reduce((a,c)=>a+c.qty,0)),gross:money(data.categories.reduce((a,c)=>a+c.gross,0)),itemDiscount:money(data.categories.reduce((a,c)=>a+c.itemDiscount,0)),orderDiscount:money(data.categories.reduce((a,c)=>a+c.orderDiscount,0)),discount:money(data.categories.reduce((a,c)=>a+c.discount,0)),net:money(data.categories.reduce((a,c)=>a+c.net,0)),vat:money(data.categories.reduce((a,c)=>a+c.vat,0)),netExVat:money(data.categories.reduce((a,c)=>a+c.netExVat,0)),mix:"100.00%"}}/>
-        <Info title="Reconciliation rule" tone="blue">Corrected category sales including VAT reconcile to AED 107,591.75. Add AED 581.00 separately classified charges to reach AED 108,172.75 invoice revenue. Charges must not be forced into categories without an explicit allocation rule.</Info>
+        <Info title="Reconciliation rule" tone="blue">Net Item Sales incl. VAT reconcile to AED 107,591.75. Add AED 581.00 Charges incl. VAT to reach AED 108,172.75 Actual Sales incl. VAT. Charges must not be forced into categories without an explicit allocation rule.</Info>
       </>}
 
       {tab==="reports"&&<>
         <section className="hero slim"><div><Badge tone="good">20 governed views</Badge><h2>Ideal restaurant reporting library</h2><p>Each view below uses the same invoice, item, payment and event facts. Select a report to understand its purpose and grain.</p></div></section>
+        <Info title="Standard sales vocabulary" tone="blue"><b>Gross Item Sales</b> is item value before reductions. <b>Discounts</b> are order/promotional reductions. <b>Complimentary</b> is an authorized free item with title, reason, user and approval; the AED 13 Fattoush on #2990 belongs only here. <b>Net Item Sales incl. VAT</b> equals gross less both reductions. <b>VAT</b> is the tax included in taxable sales and is disclosed, not deducted again from Actual Sales. <b>Net Item Sales excl. VAT</b> is the revenue base excluding VAT. <b>Charges incl. VAT</b> are separately classified invoice charges. <b>Actual Sales incl. VAT</b> equals Net Item Sales incl. VAT plus Charges incl. VAT and is the invoice/customer total.</Info>
         <div className="filters"><label className="search"><span>⌕</span><input value={reportSearch} onChange={e=>setReportSearch(e.target.value)} placeholder="Search reports and definitions…"/></label><span className="resultCount">{reportSpecs.filter(x=>x.join(" ").toLowerCase().includes(reportSearch.toLowerCase())).length} reports</span></div>
         <section className="reportGrid">{reportSpecs.filter(x=>x.join(" ").toLowerCase().includes(reportSearch.toLowerCase())).map((r,i)=><button className={`reportCard ${selectedReport===r[0]?"active":""}`} onClick={()=>{setSelectedReport(r[0]);setTimeout(()=>document.getElementById("ideal-report-preview")?.scrollIntoView({behavior:"smooth",block:"start"}),80)}} key={r[0]}><span>{String(i+1).padStart(2,"0")}</span><div><h3>{r[0]}</h3><Badge>{r[1]}</Badge><p>{r[2]}</p><strong>Preview report ↓</strong></div></button>)}</section>
-        <section className="reportPreview" id="ideal-report-preview"><div className="previewTop"><div><span>REPORT PREVIEW</span><h2>{selectedReport}</h2><p>{reportSpecs.find(x=>x[0]===selectedReport)?.[2]}</p></div><Badge tone="good">Canonical design</Badge></div>
+        <section className="reportPreview" id="ideal-report-preview"><div className="previewTop"><div><span>REPORT PREVIEW</span><h2>{selectedReport}</h2><p>{reportSpecs.find(x=>x[0]===selectedReport)?.[2]}</p></div><div className="previewLinks"><a href="/downloads/TMBill_Standardized_Reporting_Control_Pack.xlsx" download>Download full standardized pack ↓</a><Badge tone="good">Canonical design</Badge></div></div>
           <div className="previewControls"><div><small>OUTLET</small><b>Morbido Express Restaurant</b></div><div><small>PERIOD</small><b>01–30 Jun 2026</b></div><div><small>STATUS</small><b>Supplied / fulfilled</b></div><div><small>BASIS</small><b>VAT inclusive + explicit VAT</b></div></div>
           {selectedReport==="Sales / Z Summary"?<DataGrid id="report-z" rows={[{period:"01–30 Jun 2026",bills:+s.fulfilledInvoices,gross:+s.correctedGrossBeforeDiscount,itemDiscount:+s.canonicalItemDiscount,orderDiscount:+s.canonicalOrderDiscount,charges:+s.charges,vat:+s.vat,netExVat:+s.netSales,total:+s.grossSales}]} columns={[
-            {key:"period",label:"Period"},{key:"bills",label:"Bills",numeric:true},{key:"gross",label:"Original gross",numeric:true,render:x=>money(x.gross)},{key:"itemDiscount",label:"Item discount",numeric:true,render:x=>money(x.itemDiscount)},{key:"orderDiscount",label:"Order discount",numeric:true,render:x=>money(x.orderDiscount)},{key:"charges",label:"Charges",numeric:true,render:x=>money(x.charges)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Net ex VAT",numeric:true,render:x=>money(x.netExVat)},{key:"total",label:"Total revenue",numeric:true,render:x=>money(x.total)}
+            {key:"period",label:"Period"},{key:"bills",label:"Bills",numeric:true},{key:"gross",label:"Gross Item Sales",numeric:true,render:x=>money(x.gross)},{key:"orderDiscount",label:"Discounts",numeric:true,render:x=>money(x.orderDiscount)},{key:"itemDiscount",label:"Complimentary",numeric:true,render:x=>money(x.itemDiscount)},{key:"netItems",label:"Net Item Sales incl. VAT",numeric:true,value:x=>x.gross-x.itemDiscount-x.orderDiscount,render:x=>money(x.gross-x.itemDiscount-x.orderDiscount)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Net Item Sales excl. VAT",numeric:true,render:x=>money(x.netExVat-x.charges)},{key:"charges",label:"Charges incl. VAT",numeric:true,render:x=>money(x.charges)},{key:"total",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.total)}
           ]}/>
           :selectedReport==="Payment Type Summary"?<DataGrid id="report-payments" rows={paymentTotals.map(([name,total,allocations])=>({name,total,allocations,mix:total/+s.grossSales*100}))} columns={[{key:"name",label:"Tender"},{key:"allocations",label:"Allocations",numeric:true},{key:"total",label:"Collected",numeric:true,render:x=>money(x.total)},{key:"mix",label:"Mix %",numeric:true,render:x=>`${x.mix.toFixed(2)}%`}]} totals={{name:"TOTAL",allocations:"1,831",total:money(+s.grossSales),mix:"100.00%"}}/>
           :selectedReport==="Discount Summary"&&businessInsights?<><DataGrid id="report-discounts" rows={businessInsights.discountSummary} columns={[{key:"title",label:"Discount title"},{key:"reason",label:"Recorded reason"},{key:"level",label:"Level"},{key:"bills",label:"Bills",numeric:true},{key:"amount",label:"Discount",numeric:true,render:x=>money(x.amount)},{key:"users",label:"Users"},{key:"sources",label:"Linked source"}]} totals={{title:"UNIFIED TOTAL",amount:money(businessInsights.summary.unifiedDiscount)}}/><Info title="Linked discount rule" tone="blue">The complimentary AED 13 is confirmed and classified, not left as an unexplained variance. Production should preserve this item-level event separately from the AED 8.10 Al Zaeem order discount on #2990 and exclude the complimentary line from the order-discount base.</Info></>
           :selectedReport==="Bill Summary"?<DataGrid id="report-bills" rows={data.invoices} columns={[
             {key:"billNo",label:"Bill"},{key:"id",label:"Order ID"},{key:"date",label:"Supply date"},{key:"orderType",label:"Order type"},
-            {key:"canonicalGrossBeforeDiscount",label:"Gross",numeric:true,render:x=>money(x.canonicalGrossBeforeDiscount)},
-            {key:"canonicalItemDiscount",label:"Item discount",numeric:true,render:x=>money(x.canonicalItemDiscount)},
-            {key:"canonicalOrderDiscount",label:"Order discount",numeric:true,render:x=>money(x.canonicalOrderDiscount)},
-            {key:"canonicalVat",label:"VAT",numeric:true,render:x=>money(x.canonicalVat)},{key:"charges",label:"Charges",numeric:true,render:x=>money(x.charges)},{key:"total",label:"Total",numeric:true,render:x=>money(x.total)}
+            {key:"canonicalGrossBeforeDiscount",label:"Gross Item Sales",numeric:true,render:x=>money(x.canonicalGrossBeforeDiscount)},
+            {key:"canonicalOrderDiscount",label:"Discounts",numeric:true,render:x=>money(x.canonicalOrderDiscount)},
+            {key:"canonicalItemDiscount",label:"Complimentary",numeric:true,render:x=>money(x.canonicalItemDiscount)},
+            {key:"canonicalTaxableInclVat",label:"Net Item Sales incl. VAT",numeric:true,render:x=>money(x.canonicalTaxableInclVat)},
+            {key:"canonicalVat",label:"VAT",numeric:true,render:x=>money(x.canonicalVat)},{key:"canonicalNetExVat",label:"Net Item Sales excl. VAT",numeric:true,render:x=>money(x.canonicalNetExVat)},{key:"charges",label:"Charges incl. VAT",numeric:true,render:x=>money(x.charges)},{key:"total",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.total)}
           ]} totals={{billNo:"TOTAL",canonicalGrossBeforeDiscount:money(+s.correctedGrossBeforeDiscount),canonicalItemDiscount:money(+s.canonicalItemDiscount),canonicalOrderDiscount:money(+s.canonicalOrderDiscount),canonicalVat:money(5124.93),charges:money(+s.charges),total:money(+s.grossSales)}}/>
           :selectedReport==="Sold Items Summary"?<><DataGrid id="report-items" rows={data.topItems} columns={[
-            {key:"name",label:"Item"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Original gross",numeric:true,render:x=>money(x.gross)},{key:"discount",label:"Total discount",numeric:true,render:x=>money(x.discount)},{key:"net",label:"Net incl VAT",numeric:true,render:x=>money(x.net)}
-          ]} totals={{name:"ITEM SALES TOTAL",qty:num(data.topItems.reduce((a,x)=>a+x.qty,0)),gross:money(data.topItems.reduce((a,x)=>a+x.gross,0)),discount:money(data.topItems.reduce((a,x)=>a+x.discount,0)),net:money(data.topItems.reduce((a,x)=>a+x.net,0))}}/><SalesReconciliation itemSales={data.topItems.reduce((a,x)=>a+x.net,0)} charges={+s.charges} actualSales={+s.grossSales}/></>
+            {key:"name",label:"Item"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Gross Item Sales",numeric:true,render:x=>money(x.gross)},{key:"discount",label:"Total reductions",numeric:true,render:x=>money(x.discount)},{key:"net",label:"Net Item Sales incl. VAT",numeric:true,render:x=>money(x.net)}
+          ]} totals={{name:"ITEM SALES TOTAL",qty:num(data.topItems.reduce((a,x)=>a+x.qty,0)),gross:money(data.topItems.reduce((a,x)=>a+x.gross,0)),discount:money(data.topItems.reduce((a,x)=>a+x.discount,0)),net:money(data.topItems.reduce((a,x)=>a+x.net,0))}}/><SalesReconciliation grossItems={data.topItems.reduce((a,x)=>a+x.gross,0)} totalReductions={data.topItems.reduce((a,x)=>a+x.discount,0)} complimentary={+(businessInsights?.summary.itemComplimentary||0)} vat={+s.vat} charges={+s.charges} actualSales={+s.grossSales}/></>
           :selectedReport==="Category Summary"||selectedReport==="Product Group Summary"?<><DataGrid id="report-category" rows={data.categories} columns={[
-            {key:"name",label:"Category"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Original gross",numeric:true,render:x=>money(x.gross)},{key:"discount",label:"Allocated discounts",numeric:true,render:x=>money(x.discount)},{key:"net",label:"Net incl VAT",numeric:true,render:x=>money(x.net)}
-          ]} totals={{name:"ITEM SALES TOTAL",qty:num(data.categories.reduce((a,x)=>a+x.qty,0)),gross:money(data.categories.reduce((a,x)=>a+x.gross,0)),discount:money(data.categories.reduce((a,x)=>a+x.discount,0)),net:money(data.categories.reduce((a,x)=>a+x.net,0))}}/><SalesReconciliation itemSales={data.categories.reduce((a,x)=>a+x.net,0)} charges={+s.charges} actualSales={+s.grossSales}/></>
+            {key:"name",label:"Category"},{key:"qty",label:"Qty",numeric:true},{key:"gross",label:"Gross Item Sales",numeric:true,render:x=>money(x.gross)},{key:"orderDiscount",label:"Discounts",numeric:true,render:x=>money(x.orderDiscount)},{key:"itemDiscount",label:"Complimentary",numeric:true,render:x=>money(x.itemDiscount)},{key:"net",label:"Net Item Sales incl. VAT",numeric:true,render:x=>money(x.net)},{key:"vat",label:"VAT",numeric:true,render:x=>money(x.vat)},{key:"netExVat",label:"Net Item Sales excl. VAT",numeric:true,render:x=>money(x.netExVat)}
+          ]} totals={{name:"ITEM SALES TOTAL",qty:num(data.categories.reduce((a,x)=>a+x.qty,0)),gross:money(data.categories.reduce((a,x)=>a+x.gross,0)),orderDiscount:money(data.categories.reduce((a,x)=>a+x.orderDiscount,0)),itemDiscount:money(data.categories.reduce((a,x)=>a+x.itemDiscount,0)),net:money(data.categories.reduce((a,x)=>a+x.net,0)),vat:money(data.categories.reduce((a,x)=>a+x.vat,0)),netExVat:money(data.categories.reduce((a,x)=>a+x.netExVat,0))}}/><SalesReconciliation grossItems={data.categories.reduce((a,x)=>a+x.gross,0)} totalReductions={data.categories.reduce((a,x)=>a+x.discount,0)} complimentary={data.categories.reduce((a,x)=>a+x.itemDiscount,0)} vat={data.categories.reduce((a,x)=>a+x.vat,0)} charges={+s.charges} actualSales={+s.grossSales}/></>
           :selectedReport==="Cancel Items Summary"&&kotAudit?<DataGrid id="report-cancel-items" rows={kotAudit.cancellations} columns={[
             {key:"punchTime",label:"KOT punch time"},{key:"billNo",label:"Bill"},{key:"orderId",label:"Order ID"},{key:"kotId",label:"KOT ID"},{key:"item",label:"Item"},{key:"qty",label:"Qty",numeric:true},{key:"listedValue",label:"Original list value",numeric:true,render:x=>money(x.listedValue)},{key:"user",label:"User"},{key:"reason",label:"Reason",render:x=>x.reason||<Badge tone="bad">Missing</Badge>},{key:"status",label:"Status",render:x=><Badge tone="bad">{x.status}</Badge>}
           ]} totals={{billNo:"TOTAL",qty:num(kotAudit.summary.cancelledQuantity),listedValue:money(kotAudit.summary.cancelledListValue)}}/>
-          :selectedReport==="Order Type Summary"?<DataGrid id="report-orders" rows={orderTotals.map(([name,total,bills])=>({name,total,bills,vat:total*5/105,mix:total/+s.grossSales*100}))} columns={[{key:"name",label:"Order type"},{key:"bills",label:"Bills",numeric:true},{key:"total",label:"Sales",numeric:true,render:x=>money(x.total)},{key:"vat",label:"VAT control",numeric:true,render:x=>money(x.vat)},{key:"mix",label:"Mix %",numeric:true,render:x=>`${x.mix.toFixed(2)}%`}]} totals={{name:"TOTAL",bills:num(+s.fulfilledInvoices),total:money(+s.grossSales),vat:money(+s.vat),mix:"100.00%"}}/>
+          :selectedReport==="Order Type Summary"?<DataGrid id="report-orders" rows={orderTotals.map(([name,total,bills])=>({name,total,bills,vat:total*5/105,mix:total/+s.grossSales*100}))} columns={[{key:"name",label:"Order type"},{key:"bills",label:"Bills",numeric:true},{key:"total",label:"Actual Sales incl. VAT",numeric:true,render:x=>money(x.total)},{key:"vat",label:"VAT control",numeric:true,render:x=>money(x.vat)},{key:"mix",label:"Mix %",numeric:true,render:x=>`${x.mix.toFixed(2)}%`}]} totals={{name:"TOTAL",bills:num(+s.fulfilledInvoices),total:money(+s.grossSales),vat:money(+s.vat),mix:"100.00%"}}/>
           :<div className="noSource"><b>{selectedReport} layout is ready</b><p>The supplied exports do not contain the complete event-level source required to populate this report without inventing records. Its governed headers are:</p><div>{reportHeaders[selectedReport]?.map(h=><Badge key={h}>{h}</Badge>)}</div></div>}
           <Info title="Preview rule" tone="blue">Populated previews above use the current June dataset and the canonical discount calculation. Empty operational views are deliberately not fabricated; they need cash-drawer, expense, cancellation, wallet, receivable or settlement event facts.</Info>
         </section>
@@ -757,21 +767,21 @@ export default function Home() {
       {tab==="guide"&&<>
         <section className="hero"><div><Badge tone="good">Embedded documentation</Badge><h2>How to read this audit dashboard</h2><p>Use controls, not labels, to decide whether a number is trustworthy. Every metric should state its grain, inclusion rule, tax basis and reconciliation target.</p></div></section>
         <section className="guideGrid">
-          <article className="guideCard"><span>01</span><h3>Start at gross sales</h3><p>Fulfilled supplied invoices total AED 108,172.75. This is the master financial control for the period.</p></article>
-          <article className="guideCard"><span>02</span><h3>Bridge VAT explicitly</h3><p>Gross sales − invoice VAT AED 5,124.92 = net sales ex VAT AED 103,047.83.</p></article>
-          <article className="guideCard"><span>03</span><h3>Trace dimensions to lines</h3><p>Category, kitchen and item reports must use validated item lines with order discounts allocated.</p></article>
+          <article className="guideCard"><span>01</span><h3>Start at Gross Item Sales</h3><p>AED 118,066.00 preserves item value before Discounts and Complimentary.</p></article>
+          <article className="guideCard"><span>02</span><h3>Reach Actual Sales</h3><p>AED 107,591.75 Net Item Sales incl. VAT + AED 581.00 Charges incl. VAT = AED 108,172.75 Actual Sales incl. VAT.</p></article>
+          <article className="guideCard"><span>03</span><h3>Trace dimensions to lines</h3><p>Category, kitchen and item reports must allocate Discounts and classify Complimentary separately.</p></article>
           <article className="guideCard"><span>04</span><h3>Keep cancellations separate</h3><p>13 cancelled orders, 103 cancelled KOT items and post-sale refunds are different events.</p></article>
           <article className="guideCard"><span>05</span><h3>Explode split tenders</h3><p>1,831 payment allocations across 1,816 invoices is valid. Missing allocation amounts are not.</p></article>
           <article className="guideCard"><span>06</span><h3>Version menu prices</h3><p>Current-price differences become provable only when item IDs and effective-dated price versions are stored.</p></article>
         </section>
-        <section className="panel"><div className="panelHead"><div><h3>Canonical equations</h3><p>These equations should appear in dashboard tooltips and report documentation.</p></div></div>
+        <section className="panel"><div className="panelHead"><div><h3>Canonical equations</h3><p>These exact titles and equations apply to every dashboard, report and export.</p></div></div>
           <div className="formulaList">
-            <div><code>Gross item value</code><b>Σ(quantity × transaction unit price)</b></div>
-            <div><code>Post-discount line</code><b>gross − item discount − allocated order discount</b></div>
-            <div><code>Invoice VAT</code><b>Σ line VAT + charge VAT</b></div>
-            <div><code>Gross sales</code><b>net items incl VAT + charges incl VAT + round-off</b></div>
-            <div><code>Net sales ex VAT</code><b>gross sales − total VAT</b></div>
-            <div><code>Open due</code><b>gross sales − payments − wallet − credits</b></div>
+            <div><code>Gross Item Sales</code><b>Σ(quantity × transaction-time unit price)</b></div>
+            <div><code>Total Reductions</code><b>Discounts + Complimentary</b></div>
+            <div><code>Net Item Sales incl. VAT</code><b>Gross Item Sales − Discounts − Complimentary</b></div>
+            <div><code>Net Item Sales excl. VAT</code><b>Net Item Sales incl. VAT − item VAT</b></div>
+            <div><code>Actual Sales incl. VAT</code><b>Net Item Sales incl. VAT + Charges incl. VAT + round-off</b></div>
+            <div><code>Open due</code><b>Actual Sales incl. VAT − payments − wallet − credits</b></div>
           </div>
         </section>
         <Info title="Inventory warning" tone="red">Raw-material cost is zero because recipes and costs are not configured. AED 118,053 is gross item subtotal—not gross margin. A 100% gross-profit percentage must not be displayed until COGS exists.</Info>
