@@ -469,7 +469,7 @@ export default function Home() {
     <aside className="sidebar">
       <div className="brand"><div className="brandLogoCrop"><img src="/tmbill-logo-source.png" alt="TMBill Technology LLC"/></div><div><b>TMBill Audit</b><small>Revenue intelligence</small></div><button className="navToggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?"Expand navigation":"Collapse navigation"}>{sidebarCollapsed?"›":"‹"}</button></div>
       <div className="period"><span>Review period</span><b>June 2026</b><small>The SS · Morbido Express</small></div>
-      <nav>{tabs.map(([id,label])=><button key={id} title={label} data-label={label} className={tab===id?"active":""} onClick={()=>{setTab(id);if(sidebarCollapsed){setSidebarCollapsed(false);window.setTimeout(()=>setSidebarCollapsed(true),1200)}}}><i>{tabIcons[id]}</i><span>{label}</span>{id==="bills"&&<em>1</em>}{id==="items"&&<em>915</em>}</button>)}</nav>
+      <nav>{tabs.map(([id,label])=><button key={id} title={label} data-label={label} className={tab===id?"active":""} onClick={()=>setTab(id)}><i>{tabIcons[id]}</i><span>{label}</span>{id==="bills"&&<em>1</em>}{id==="items"&&<em>915</em>}</button>)}</nav>
       <div className="sideControl"><span>Overall reconciliation</span><strong>3 confirmed defects</strong><small>Core invoice ledger passes</small></div>
     </aside>
     <main className="main">
@@ -640,33 +640,15 @@ export default function Home() {
             {key:"vatAssessment",label:"VAT check",defaultVisible:false,render:x=><Badge tone={x.vatAssessment==="exact"?"good":"warn"}>{x.vatAssessment}</Badge>},
             {key:"controlStatus",label:"Control",render:x=><Badge tone={x.controlStatus==="pass"?"good":x.controlStatus==="corrected"?"warn":"bad"}>{x.controlStatus}</Badge>}
           ]} totals={{billNo:"TOTAL",guests:num(filteredInvoices.reduce((a,x)=>a+x.guests,0)),canonicalGrossBeforeDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalGrossBeforeDiscount,0)),canonicalItemDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalItemDiscount,0)),canonicalOrderDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalOrderDiscount,0)),canonicalTotalDiscount:money(filteredInvoices.reduce((a,x)=>a+x.canonicalTotalDiscount,0)),canonicalTaxableInclVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalTaxableInclVat,0)),canonicalNetExVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalNetExVat,0)),canonicalVat:money(filteredInvoices.reduce((a,x)=>a+x.canonicalVat,0)),charges:money(filteredInvoices.reduce((a,x)=>a+x.charges,0)),total:money(filteredInvoices.reduce((a,x)=>a+x.total,0))}}/>
-          <div className="drawer">{selected&&<><div className="drawerHead"><div><span>INVOICE TRACE</span><h3>Bill #{selected.billNo}</h3><p>{selected.date} · {selected.time} · {selected.orderType}</p></div>{selected.hasAnomaly?<Badge tone="bad">FAIL</Badge>:<Badge tone="good">PASS</Badge>}</div>
+          <div className="drawer">{selected&&<><div className="drawerHead"><div><span>INVOICE TRACE</span><h3>Bill #{selected.billNo}</h3><p>{selected.date} · {selected.time} · <ChannelBadge name={selected.orderType}/></p></div>{selected.hasAnomaly?<Badge tone="bad">FAIL</Badge>:<Badge tone="good">PASS</Badge>}</div>
             <div className="invoiceTime"><div><span>ORDER PLACED</span><b>{selectedTurnaround?.placedAt||"Not captured"}</b></div><i>→</i><div><span>SETTLED</span><b>{selectedTurnaround?.settledAt||"Not captured"}</b></div><strong><span>CUSTOMER / ORDER TURNAROUND</span>{minutesLabel(selectedTurnaround?.turnaroundMinutes)}</strong></div>
             <div className="bridge"><div><span>Subtotal</span><b>{money(selected.subtotal)}</b></div><i>−</i><div><span>Invoice discount</span><b>{money(selected.discount)}</b></div><i>+</i><div><span>Charges</span><b>{money(selected.charges)}</b></div><i>=</i><div className="total"><span>Gross total</span><b>{money(selected.total)}</b></div></div>
             <div className="controlBox bad"><span>ITEM ↔ INVOICE DISCOUNT CONTROL</span><div><b>Item lines</b><strong>{money(selected.itemLineDiscount)}</strong></div><div><b>Invoice header</b><strong>{money(selected.discount)}</strong></div><div><b>Variance</b><strong>{money(selected.discountVariance)}</strong></div></div>
             <div className="controlBox"><span>CORRECTED DISCOUNT & VAT BRIDGE</span><div><b>Gross Item Sales</b><strong>{money(selected.canonicalGrossBeforeDiscount)}</strong></div><div><b>Less: Item Discounts</b><strong>− {money(selected.canonicalItemDiscount)}</strong></div><div><b>Less: Order Discounts</b><strong>− {money(selected.canonicalOrderDiscount)}</strong></div><div><b>Net Item Sales incl. VAT</b><strong>{money(selected.canonicalTaxableInclVat)}</strong></div><div><b>VAT included (5/105)</b><strong>{money(selected.canonicalVat)}</strong></div><div><b>Net Item Sales excl. VAT</b><strong>{money(selected.canonicalNetExVat)}</strong></div></div>
             <h4>Item lines</h4>{selectedLines.map(x=><div className={`lineCard ${x.anomaly?"anomaly":""}`} key={x.rowId}><div><b>{x.name}</b><small>{x.itemId} · Qty {x.qty} · {x.category}</small></div><div><span>Price</span><b>{money(x.actualPrice)}</b></div><div><span>Discount</span><b>{money(x.lineDiscount)}</b></div><div><span>Net export</span><b>{money(x.netAmount)}</b></div>{x.anomaly&&<Badge tone="bad">Negative taxable line</Badge>}</div>)}
             {selected.billNo==="2990"&&<Info title="Correct treatment for #2990" tone="red">Fattoush original value ⃃ 13.00 is fully removed as an item discount. It is excluded from the 10% order-discount base. The eligible ⃃ 81.00 receives ⃃ 8.10 order discount: original gross ⃃ 94.00 − item discount ⃃ 13.00 − order discount ⃃ 8.10 = taxable total ⃃ 72.90, VAT ⃃ 3.47 and net ex VAT ⃃ 69.43.</Info>}
-            <div className="ebillHead"><div><h4>3-inch eBill preview</h4><p>Local audit preview · official receipt linked for verification</p></div><a href={`https://backoffice.tmbill.com/ebill/${selected.id}`} target="_blank" rel="noreferrer">Open official receipt ↗</a></div>
-            <div className="receiptFrame local">
-              <div className="receiptLocal">
-                <div className="receiptAccent"/>
-                <div className="receiptBrand">MORBIDO</div>
-                <h3>Morbido Express Restaurant</h3>
-                <p>Eastern Rd - Al Nahyan - E19 02 - Abu Dhabi - UAE</p>
-                <p>TAX Invoice</p><p>TRN: 104855802500003</p>
-                <div className="receiptRule"/>
-                <p>{selected.date} · {selected.time}</p><b className="orderPill">{selected.orderType}</b>
-                <h2>Order No: {selected.billNo}</h2><small>Order ID: {selected.id}</small>
-                <div className="receiptSection"><h5>Order Details</h5><div><span>Status</span><b>{selected.status}</b></div><div><span>Table</span><b>{selected.table||"—"}</b></div><div><span>User</span><b>{selected.user}</b></div><div><span>Payment</span><b>{selected.paymentMode}</b></div></div>
-                <div className="receiptSection"><h5>Order Items</h5><div className="receiptItem head"><span>Item</span><span>Qty</span><span>Rate</span><span>Total</span></div>
-                  {selectedLines.map(x=><div className="receiptItem" key={x.rowId}><span>{x.name}{x.lineDiscount>0&&<small>Discount {money(x.lineDiscount)}</small>}</span><span>{x.qty}</span><span>{money(x.actualPrice===0&&x.lineDiscount>0?x.lineDiscount/x.qty:x.actualPrice).replace("AED","")}</span><span>{money(Math.max(0,x.netAmount)).replace("AED","")}</span></div>)}
-                </div>
-                <div className="receiptSection summary"><div><span>Subtotal</span><b>{money(selected.subtotal)}</b></div><div><span>Total Discount</span><b>{money(selected.discount)}</b></div><div><span>Total Without Tax</span><b>{money(selected.total-selected.vat)}</b></div><div><span>Total Tax</span><b>{money(selected.vat)}</b></div><div className="grand"><span>Grand Total</span><b>{money(selected.total)}</b></div></div>
-                <div className="receiptSection"><h5>Payment Info</h5><div><span>{selected.paymentMode}</span><b>{money(selected.total)}</b></div></div>
-                <p className="thanks">Thank You! 🙏</p><small>Powered by TMBill · Local audit reconstruction</small>
-              </div>
-            </div>
+            <div className="ebillHead"><div><h4>Official TMBill 3-inch eBill</h4><p>Live receipt rendered directly from the TMBill back office.</p></div><a href={`https://backoffice.tmbill.com/ebill/${selected.id}`} target="_blank" rel="noreferrer">Open original receipt ↗</a></div>
+            <div className="receiptFrame official"><iframe title={`Official TMBill eBill ${selected.billNo}`} src={`https://backoffice.tmbill.com/ebill/${selected.id}`} loading="lazy"/></div>
           </>}</div>
         </div>:<DataGrid id="item-ledger" rows={filteredItems} columns={[
           {key:"name",label:"Item",render:x=><><b>{x.name}</b><small>Bill #{x.billNo} · {x.itemId}</small></>},{key:"orderType",label:"Order type"},{key:"qty",label:"Qty",numeric:true},
